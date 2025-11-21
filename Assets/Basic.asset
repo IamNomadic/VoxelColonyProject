@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50d17833eb333044d817a1253fd4dc39, type: 3}
+  m_Name: Basic
+  m_EditorClassIdentifier: 
+  layers:
+  - name: stone
+    height: 4
+    baseHeightOffset: 1
+    maxAdditionalHeight: 2
+    blockData: {fileID: 11400000, guid: d0c417f1261d8e54bbd3e0f09f75e11b, type: 2}
+    heightNoise: {fileID: 11400000, guid: 82bd966920881e04aaefb4e088fdbcc1, type: 2}
+    noiseScale: 1
+    noiseAmplitude: 1
+  - name: dirt
+    height: 3
+    baseHeightOffset: 1
+    maxAdditionalHeight: 2
+    blockData: {fileID: 11400000, guid: 735cff619ddc5f446b3b42d2250e0622, type: 2}
+    heightNoise: {fileID: 11400000, guid: 82bd966920881e04aaefb4e088fdbcc1, type: 2}
+    noiseScale: 1
+    noiseAmplitude: 1
+  - name: grass
+    height: 0
+    baseHeightOffset: 1
+    maxAdditionalHeight: 4
+    blockData: {fileID: 11400000, guid: 28f2ce4c08206644b9924f345157bdaa, type: 2}
+    heightNoise: {fileID: 11400000, guid: 82bd966920881e04aaefb4e088fdbcc1, type: 2}
+    noiseScale: 1
+    noiseAmplitude: 1
+  width: 75
+  depth: 75
