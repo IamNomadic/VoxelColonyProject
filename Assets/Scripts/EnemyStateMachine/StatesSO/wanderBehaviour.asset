@@ -15,7 +15,7 @@ MonoBehaviour:
   moveSpeed: 5
   waitTime: 1
   wanderRadius: 5
-  gridOffset: {x: 0, y: 0, z: 0}
+  gridOffset: {x: 0.5, y: 0, z: 0.5}
   verticalOffset: 0.1
   obstacleMask:
     serializedVersion: 2

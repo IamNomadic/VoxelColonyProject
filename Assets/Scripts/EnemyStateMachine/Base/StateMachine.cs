@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+[RequireComponent(typeof(PawnIdentity))]
+[RequireComponent(typeof(Rigidbody))]
 public class PawnStateMachine : MonoBehaviour
 {
     [Header("Setup")]
@@ -13,9 +15,10 @@ public class PawnStateMachine : MonoBehaviour
         var world = FindObjectOfType<VoxelWorld>();
         var rb = GetComponent<Rigidbody>();
         var anim = GetComponent<Animator>();
+        var id = GetComponent<PawnIdentity>();
 
-        // Create Blackboard
-        ctx = new PawnContext(transform, rb, world, anim);
+        // Create Blackboard with Identity
+        ctx = new PawnContext(transform, rb, world, anim, id);
 
         // Snap to Grid immediately on spawn to align with voxels
         SnapToGrid();
@@ -79,12 +82,11 @@ public class PawnStateMachine : MonoBehaviour
 
     void SnapToGrid()
     {
-        // Assume 0.5 offset for Cube
-        float yOffset = 0.5f;
+        // Snap to center of block (0.5 on X/Z, 0 on Y for feet)
         Vector3 snapped = new Vector3(
-            Mathf.Round(transform.position.x),
-            Mathf.Round(transform.position.y - yOffset) + yOffset,
-            Mathf.Round(transform.position.z)
+            Mathf.Floor(transform.position.x) + 0.5f,
+            Mathf.Floor(transform.position.y),
+            Mathf.Floor(transform.position.z) + 0.5f
         );
         transform.position = snapped;
         ctx.currentGridTarget = snapped;

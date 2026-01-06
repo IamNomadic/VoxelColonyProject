@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cd7d63ace32402d499c5363707bc1b73, type: 3}
-  m_Name: PawnState
+  m_Name: PredatorWander
   m_EditorClassIdentifier: 
   Behaviour: {fileID: 11400000, guid: a95d26180f22adc47876c0ce2a210487, type: 2}
   Transitions:
   - Conditions:
-    - {fileID: 11400000, guid: 09bd50bfbd12edd4e801fe467cc2075f, type: 2}
-    NextState: {fileID: 11400000}
+    - {fileID: 11400000, guid: 3c4e277106280454eaaf2a66de56124c, type: 2}
+    NextState: {fileID: 11400000, guid: 86bee6c63132d9543b4732d071111e15, type: 2}

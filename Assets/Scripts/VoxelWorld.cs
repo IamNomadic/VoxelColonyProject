@@ -150,7 +150,29 @@ public class VoxelWorld : MonoBehaviour
         c.chunkCoord = new Vector2Int(x, z);
         chunks.Add(new Vector2Int(x, z), c);
     }
+    public BlockData GetBlock(Vector3 worldPos)
+    {
+        int x = Mathf.FloorToInt(worldPos.x);
+        int y = Mathf.FloorToInt(worldPos.y);
+        int z = Mathf.FloorToInt(worldPos.z);
 
+        // Calculate Chunk Coordinates
+        int cx = x / Chunk.CHUNK_SIZE;
+        int cz = z / Chunk.CHUNK_SIZE;
+        int lx = x % Chunk.CHUNK_SIZE;
+        int lz = z % Chunk.CHUNK_SIZE;
+
+        // Handle negative coordinates (if your world expands negatively)
+        if (lx < 0) { lx += Chunk.CHUNK_SIZE; cx--; }
+        if (lz < 0) { lz += Chunk.CHUNK_SIZE; cz--; }
+
+        if (chunks.TryGetValue(new Vector2Int(cx, cz), out Chunk chunk))
+        {
+            return chunk.GetBlock(lx, y, lz);
+        }
+
+        return null; // Return null (Empty) if chunk doesn't exist
+    }
     // Helper for initial generation (doesn't trigger mesh rebuild)
     void SetBlockDataOnly(int x, int y, int z, BlockData data)
     {
