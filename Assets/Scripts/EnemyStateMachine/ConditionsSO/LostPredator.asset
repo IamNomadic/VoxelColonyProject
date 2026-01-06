@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: LostPredator
   m_EditorClassIdentifier: 
   targetType: 1
-  reverse: 0
+  reverse: 1

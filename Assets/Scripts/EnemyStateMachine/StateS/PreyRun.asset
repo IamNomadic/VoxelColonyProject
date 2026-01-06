@@ -15,5 +15,5 @@ MonoBehaviour:
   Behaviour: {fileID: 11400000, guid: e834da3c42c0dd847b367bd858230f6f, type: 2}
   Transitions:
   - Conditions:
-    - {fileID: 11400000, guid: 09bd50bfbd12edd4e801fe467cc2075f, type: 2}
-    NextState: {fileID: 11400000}
+    - {fileID: 11400000, guid: 10cefeac0ac3fed40aa03588bcf7d757, type: 2}
+    NextState: {fileID: 11400000, guid: 01b486fb6b745664da3292118f06a65c, type: 2}

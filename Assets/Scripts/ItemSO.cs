@@ -13,7 +13,7 @@ public class ItemSO : ScriptableObject
     [Tooltip("Base spawn chance for this item. Final spawn chance is baseChance * biomeMultiplier.")]
     [SerializeField] public float spawnChance;
     [Tooltip("Which biomes this item is allowed to spawn in.")]
-    [SerializeField] public List<BiomeSO> allowedBiomes;
+    [SerializeField] public List<VoxelBiomeSO> allowedBiomes;
     [Tooltip("How many of this item can stack in inventory.")]
     [SerializeField] public int maxStackSize = 1;
     [Tooltip("Select the category/type of this item.")]
@@ -21,7 +21,7 @@ public class ItemSO : ScriptableObject
     [System.Serializable]
     public struct BiomeSpawnMultiplier
     {
-        public BiomeSO biome;
+        public VoxelBiomeSO biome;
         [Tooltip("Multiplier applied to base spawnChance when in this biome.")]
         public float multiplier;
     }
@@ -32,7 +32,7 @@ public class ItemSO : ScriptableObject
     /// <summary>
     /// Returns the spawn‐rate multiplier for the given biome. If not overridden, returns 1.
     /// </summary>
-    public float GetSpawnMultiplier(BiomeSO biome)
+    public float GetSpawnMultiplier(VoxelBiomeSO biome)
     {
         if (biomeMultipliers != null)
         {

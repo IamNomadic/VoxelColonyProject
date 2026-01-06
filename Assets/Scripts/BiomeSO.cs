@@ -1,29 +1,18 @@
 using UnityEngine;
-using UnityEngine.Tilemaps;
-using System.Collections.Generic;
-using System;
 
-[CreateAssetMenu(fileName = "biome", menuName = "ScriptableObjects/newbiome", order = 1)]
-public class BiomeSO : ScriptableObject
+[CreateAssetMenu(fileName = "NewVoxelBiome", menuName = "Voxel/Biome")]
+public class VoxelBiomeSO : ScriptableObject
 {
-    [Header("Base Properties")]
-    public String biomeName;
+    [Header("Visuals")]
+    public string biomeName;
+    public Color debugColor = Color.green; // For debug views
 
+    [Header("Blocks")]
+    public BlockData surfaceBlock; // Top layer (Grass, Sand, Snow)
+    public BlockData subSurfaceBlock; // Below top (Dirt, Sandstone)
 
-    protected virtual void OnEnable()
-    {
-
-    }
-
-
-    protected virtual void OnDisable()
-    {
-
-    }
-
-    protected virtual void OnDestroy()
-    {
-
-    }
-
+    [Header("Terrain Shape")]
+    public int baseHeight = 10;      // The floor level of this biome
+    public float terrainScale = 0.05f; // How wide the hills are
+    public int terrainAmplitude = 10;  // How tall the hills are
 }

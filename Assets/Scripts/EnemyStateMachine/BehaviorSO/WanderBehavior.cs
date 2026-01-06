@@ -17,10 +17,10 @@ public class VoxelWanderBehavior : PawnStateBehaviour
         if (ctx.rb != null) ctx.rb.isKinematic = true;
         if (startPos == Vector3.zero) startPos = ctx.transform.position;
 
-        ctx.currentGridTarget = ctx.transform.position;
+        // Ensure we start with a snapped target
+        ctx.SetTargetAndSnap(ctx.transform.position);
         isMoving = false;
 
-        // Add random startup delay so they don't all move on Frame 1
         ctx.stateTimer = Time.time + Random.Range(0f, 1.0f);
         PickNewTarget(ctx);
     }
@@ -53,21 +53,18 @@ public class VoxelWanderBehavior : PawnStateBehaviour
             moveSpeed * Time.deltaTime
         );
 
-        // Rotation
         Vector3 dir = ctx.currentGridTarget - ctx.transform.position;
         dir.y = 0;
         if (dir.sqrMagnitude > 0.01f)
         {
             Quaternion rot = Quaternion.LookRotation(dir);
-            ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, rot, 10f * Time.deltaTime);
+            ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, rot, 5f * Time.deltaTime);
         }
 
         if (Vector3.Distance(ctx.transform.position, ctx.currentGridTarget) < 0.01f)
         {
             ctx.transform.position = ctx.currentGridTarget;
             isMoving = false;
-
-            // Randomize wait time (e.g. 2.0s becomes 1.6s to 2.4s)
             float variance = Random.Range(0.8f, 1.2f);
             ctx.stateTimer = Time.time + (waitTime * variance);
         }
@@ -78,7 +75,7 @@ public class VoxelWanderBehavior : PawnStateBehaviour
         Vector3 currentPos = ctx.transform.position;
         Vector3[] directions = { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
 
-        // Shuffle directions
+        // Shuffle
         for (int i = 0; i < directions.Length; i++)
         {
             Vector3 temp = directions[i];
@@ -91,12 +88,10 @@ public class VoxelWanderBehavior : PawnStateBehaviour
         {
             Vector3 candidate = currentPos + dir;
             if (CheckAndSet(ctx, candidate)) return;
-
             if (CheckAndSet(ctx, candidate + Vector3.up)) return;
             if (CheckAndSet(ctx, candidate + Vector3.down)) return;
         }
 
-        // If blocked, wait a short random time before trying again
         isMoving = false;
         ctx.stateTimer = Time.time + Random.Range(0.5f, 1.0f);
     }
@@ -105,10 +100,10 @@ public class VoxelWanderBehavior : PawnStateBehaviour
     {
         if (Vector3.Distance(target, startPos) > wanderRadius) return false;
 
-        // Uses the fixed IsWalkable logic
         if (VoxelPathHelper.IsWalkable(ctx.world, target))
         {
-            ctx.currentGridTarget = target;
+            // USE THE FIX
+            ctx.SetTargetAndSnap(target);
             isMoving = true;
             return true;
         }

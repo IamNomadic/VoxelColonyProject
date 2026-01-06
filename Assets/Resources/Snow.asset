@@ -9,8 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8ca1ad65e9d76f14a855ad45f3fd7fab, type: 3}
-  m_Name: LostPrey
+  m_Script: {fileID: 11500000, guid: 670d1da1f5a87064b97b4c7d04330481, type: 3}
+  m_Name: Snow
   m_EditorClassIdentifier: 
-  targetType: 0
-  reverse: 1
+  blockName: Grass
+  blockMaterial: {fileID: 2100000, guid: ec227086da64e024db3656ed8ac22d39, type: 2}
+  blockColor: {r: 1, g: 1, b: 1, a: 1}
+  blockScale: {x: 1, y: 1, z: 1}

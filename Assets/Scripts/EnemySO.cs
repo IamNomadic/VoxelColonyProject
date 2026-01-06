@@ -17,7 +17,7 @@ public class EnemySO : ScriptableObject
     public AudioClip hurtNoise;
     public AudioClip deathNoise;
     public AudioClip attackNoise;
-    public List<BiomeSO> allowedBiomes;
+    public List<VoxelBiomeSO> allowedBiomes;
 
 
     protected virtual void OnEnable()

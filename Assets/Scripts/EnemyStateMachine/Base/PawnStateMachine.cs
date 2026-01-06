@@ -6,29 +6,36 @@ public class PawnStateMachine : MonoBehaviour
 {
     [Header("Setup")]
     [SerializeField] private PawnStateSO initialState;
+    [SerializeField] private float gravitySpeed = 15f; // How fast they fall
 
     private PawnStateSO currentStateInstance;
     private PawnContext ctx;
+    private bool hasLanded = false; // <-- New Flag for gravity
 
     void Awake()
     {
+        // We only SETUP references here. We do NOT look for ground yet.
         var world = FindObjectOfType<VoxelWorld>();
         var rb = GetComponent<Rigidbody>();
         var anim = GetComponent<Animator>();
         var id = GetComponent<PawnIdentity>();
 
-        // Create Blackboard with Identity
+        // Initialize Blackboard
         ctx = new PawnContext(transform, rb, world, anim, id);
-
-        // Snap to Grid immediately on spawn to align with voxels
-        SnapToGrid();
-
-        if (initialState != null)
-            TransitionTo(initialState);
     }
 
     void Update()
     {
+        // PHASE 1: FALLING
+        // If we haven't landed yet, do nothing but fall.
+        if (!hasLanded)
+        {
+            HandleGravity();
+            return;
+        }
+
+        // PHASE 2: AI LOGIC
+        // Once landed, the state machine takes over.
         if (currentStateInstance == null) return;
 
         // Check Transitions
@@ -62,6 +69,36 @@ public class PawnStateMachine : MonoBehaviour
             currentStateInstance.Behaviour.Execute(ctx);
     }
 
+    private void HandleGravity()
+    {
+        // 1. Move Down physically
+        transform.position += Vector3.down * gravitySpeed * Time.deltaTime;
+
+        // 2. Check if we hit valid ground
+        // We use the Helper to check: "Is the block below me solid?"
+        if (VoxelPathHelper.IsWalkable(ctx.world, transform.position, checkPawns: false))
+        {
+            // We found ground! 
+            hasLanded = true;
+
+            // Snap strictly to the grid + offset to stop the falling cleanly
+            ctx.SetTargetAndSnap(transform.position);
+            transform.position = ctx.currentGridTarget;
+
+            // Now we can start the AI Brain
+            if (initialState != null)
+                TransitionTo(initialState);
+        }
+
+        // Safety: If we fell into the void (Chunk failed to load), stop falling eventually
+        if (transform.position.y < -50)
+        {
+            // Optional: Respawn or Destroy
+            hasLanded = true; // Stop processing gravity
+            enabled = false;  // Disable script
+        }
+    }
+
     public void TransitionTo(PawnStateSO nextState)
     {
         if (currentStateInstance != null && currentStateInstance.Behaviour != null)
@@ -69,7 +106,6 @@ public class PawnStateMachine : MonoBehaviour
 
         ctx.lastTransitionTime = Time.time;
 
-        // Create deep copy of state so values don't overlap between enemies
         currentStateInstance = Instantiate(nextState);
         if (nextState.Behaviour != null)
         {
@@ -78,17 +114,5 @@ public class PawnStateMachine : MonoBehaviour
 
         if (currentStateInstance.Behaviour != null)
             currentStateInstance.Behaviour.Enter(ctx);
-    }
-
-    void SnapToGrid()
-    {
-        // Snap to center of block (0.5 on X/Z, 0 on Y for feet)
-        Vector3 snapped = new Vector3(
-            Mathf.Floor(transform.position.x) + 0.5f,
-            Mathf.Floor(transform.position.y),
-            Mathf.Floor(transform.position.z) + 0.5f
-        );
-        transform.position = snapped;
-        ctx.currentGridTarget = snapped;
     }
 }
