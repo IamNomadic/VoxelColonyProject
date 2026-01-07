@@ -9,14 +9,16 @@ public enum PawnType
 
 public class PawnIdentity : MonoBehaviour
 {
-    [Header("Identity")]
+    [Header("1. Identity")]
+    [Tooltip("The species/role of this pawn.")]
     public PawnType type;
 
-    [Header("Positioning")]
-    [Tooltip("Lift the pawn up by this amount so it doesn't clip into the ground.")]
-    public float verticalOffset = 1.0f; // Default 1.0 works well for Capsules
+    [Header("2. Physical Config")]
+    [Tooltip("Vertical adjustment. \n0.5 = Pivot at feet. \n1.0 = Pivot at center.")]
+    public float verticalOffset = 1.0f;
 
-    [Header("Senses")]
+    [Header("3. AI Senses")]
+    [Tooltip("Radius (in blocks) that this pawn can detect friends or enemies.")]
     public float sightRadius = 15f;
 
     void Start()
@@ -24,6 +26,7 @@ public class PawnIdentity : MonoBehaviour
         UpdateColor();
     }
 
+    // Debug coloring based on type
     public void UpdateColor()
     {
         Renderer rend = GetComponent<Renderer>();

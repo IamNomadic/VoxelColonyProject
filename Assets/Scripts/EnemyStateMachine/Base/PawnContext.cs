@@ -8,7 +8,9 @@ public class PawnContext
     public Rigidbody rb;
     public Animator animator;
     public VoxelWorld world;
-    public PawnIdentity identity;
+
+    // THE NEW DATA SOURCE
+    public PawnDataSO data;
 
     // Runtime Data
     public Vector3 currentGridTarget;
@@ -20,32 +22,27 @@ public class PawnContext
     private Transform cachedTarget;
     private const float SCAN_INTERVAL = 0.5f;
 
-    public PawnContext(Transform t, Rigidbody r, VoxelWorld w, Animator a, PawnIdentity id)
+    public PawnContext(Transform t, Rigidbody r, VoxelWorld w, Animator a, PawnDataSO d)
     {
         transform = t;
         gameObject = t.gameObject;
         rb = r;
         world = w;
         animator = a;
-        identity = id;
+        data = d;
     }
 
-    // --- THE FIX: ROBUST SETTER ---
-    // Instead of setting currentGridTarget directly, use this helper.
-    // It strips out any floating point errors and re-applies the exact Identity offset.
+    // --- UPDATED SENSOR LOGIC ---
     public void SetTargetAndSnap(Vector3 rawPosition)
     {
-        // 1. Integer Floor the coordinates to find the Block Index
         float ix = Mathf.Floor(rawPosition.x);
         float iy = Mathf.Floor(rawPosition.y);
         float iz = Mathf.Floor(rawPosition.z);
 
-        // 2. Re-apply the perfect offsets
-        // X and Z get +0.5 to be in the center of the block.
-        // Y gets the verticalOffset from the Identity script.
+        // Read offset from DATA now
         currentGridTarget = new Vector3(
             ix + 0.5f,
-            iy + identity.verticalOffset,
+            iy + data.verticalOffset,
             iz + 0.5f
         );
     }
@@ -60,15 +57,19 @@ public class PawnContext
         lastScanTime = Time.time;
         cachedTarget = null;
 
-        Collider[] hits = Physics.OverlapSphere(transform.position, identity.sightRadius);
+        // Scan using data.sightRadius
+        Collider[] hits = Physics.OverlapSphere(transform.position, data.sightRadius);
         float closestDist = float.MaxValue;
 
         foreach (var hit in hits)
         {
             if (hit.gameObject == gameObject) continue;
 
-            var otherPawn = hit.GetComponent<PawnIdentity>();
-            if (otherPawn != null && otherPawn.type == searchType)
+            // FIX: We now look for the StateMachine, because PawnIdentity is gone
+            var otherPawn = hit.GetComponent<PawnStateMachine>();
+
+            // Access data through the StateMachine
+            if (otherPawn != null && otherPawn.Data != null && otherPawn.Data.type == searchType)
             {
                 float d = Vector3.Distance(transform.position, hit.transform.position);
                 if (d < closestDist)

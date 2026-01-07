@@ -1,44 +1,55 @@
 ﻿using UnityEngine;
 
-[RequireComponent(typeof(PawnIdentity))]
+// Removed [RequireComponent(typeof(PawnIdentity))]
 [RequireComponent(typeof(Rigidbody))]
 public class PawnStateMachine : MonoBehaviour
 {
-    [Header("Setup")]
-    [SerializeField] private PawnStateSO initialState;
-    [SerializeField] private float gravitySpeed = 15f; // How fast they fall
+    [Header("Configuration")]
+    [Tooltip("Drag the Data Profile (Stats/Species) here.")]
+    [SerializeField] private PawnDataSO pawnData;
 
+    [Tooltip("The AI State Logic.")]
+    [SerializeField] private PawnStateSO initialState;
+    public PawnStateSO CURRENTSTATE;
+    // Public Accessor for Sensors (So other pawns can read my type)
+    public PawnDataSO Data => pawnData;
+
+    // Internal
     private PawnStateSO currentStateInstance;
     private PawnContext ctx;
-    private bool hasLanded = false; // <-- New Flag for gravity
+    private bool hasLanded = false;
 
     void Awake()
     {
-        // We only SETUP references here. We do NOT look for ground yet.
+        if (pawnData == null)
+        {
+            Debug.LogError($"Pawn {name} is missing PawnDataSO!");
+            enabled = false;
+            return;
+        }
+
         var world = FindObjectOfType<VoxelWorld>();
         var rb = GetComponent<Rigidbody>();
         var anim = GetComponent<Animator>();
-        var id = GetComponent<PawnIdentity>();
 
-        // Initialize Blackboard
-        ctx = new PawnContext(transform, rb, world, anim, id);
+        // Initialize Context with DATA
+        ctx = new PawnContext(transform, rb, world, anim, pawnData);
+
+        // Apply Debug Color immediately
+        UpdateColor();
     }
 
     void Update()
     {
-        // PHASE 1: FALLING
-        // If we haven't landed yet, do nothing but fall.
+        CURRENTSTATE = currentStateInstance;
         if (!hasLanded)
         {
             HandleGravity();
             return;
         }
 
-        // PHASE 2: AI LOGIC
-        // Once landed, the state machine takes over.
         if (currentStateInstance == null) return;
 
-        // Check Transitions
         if (currentStateInstance.Transitions != null)
         {
             foreach (var t in currentStateInstance.Transitions)
@@ -48,11 +59,7 @@ public class PawnStateMachine : MonoBehaviour
                 {
                     foreach (var cond in t.Conditions)
                     {
-                        if (!cond.Evaluate(ctx))
-                        {
-                            allTrue = false;
-                            break;
-                        }
+                        if (!cond.Evaluate(ctx)) { allTrue = false; break; }
                     }
                 }
 
@@ -64,39 +71,25 @@ public class PawnStateMachine : MonoBehaviour
             }
         }
 
-        // Execute State
         if (currentStateInstance.Behaviour != null)
             currentStateInstance.Behaviour.Execute(ctx);
     }
 
     private void HandleGravity()
     {
-        // 1. Move Down physically
-        transform.position += Vector3.down * gravitySpeed * Time.deltaTime;
+        // Read gravity speed from DATA
+        transform.position += Vector3.down * pawnData.gravitySpeed * Time.deltaTime;
 
-        // 2. Check if we hit valid ground
-        // We use the Helper to check: "Is the block below me solid?"
         if (VoxelPathHelper.IsWalkable(ctx.world, transform.position, checkPawns: false))
         {
-            // We found ground! 
             hasLanded = true;
-
-            // Snap strictly to the grid + offset to stop the falling cleanly
             ctx.SetTargetAndSnap(transform.position);
             transform.position = ctx.currentGridTarget;
 
-            // Now we can start the AI Brain
-            if (initialState != null)
-                TransitionTo(initialState);
+            if (initialState != null) TransitionTo(initialState);
         }
 
-        // Safety: If we fell into the void (Chunk failed to load), stop falling eventually
-        if (transform.position.y < -50)
-        {
-            // Optional: Respawn or Destroy
-            hasLanded = true; // Stop processing gravity
-            enabled = false;  // Disable script
-        }
+        if (transform.position.y < -50) { hasLanded = true; enabled = false; }
     }
 
     public void TransitionTo(PawnStateSO nextState)
@@ -108,11 +101,25 @@ public class PawnStateMachine : MonoBehaviour
 
         currentStateInstance = Instantiate(nextState);
         if (nextState.Behaviour != null)
-        {
             currentStateInstance.Behaviour = Instantiate(nextState.Behaviour);
-        }
 
         if (currentStateInstance.Behaviour != null)
             currentStateInstance.Behaviour.Enter(ctx);
+    }
+
+    void UpdateColor()
+    {
+        Renderer rend = GetComponent<Renderer>();
+        if (rend == null) rend = GetComponentInChildren<Renderer>();
+        if (rend != null) rend.material.color = pawnData.debugColor;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (pawnData != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(transform.position, pawnData.sightRadius);
+        }
     }
 }

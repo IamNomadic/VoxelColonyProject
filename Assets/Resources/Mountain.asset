@@ -14,8 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   biomeName: 
   debugColor: {r: 0, g: 1, b: 0, a: 1}
-  surfaceBlock: {fileID: 0}
-  subSurfaceBlock: {fileID: 0}
-  baseHeight: 10
-  terrainScale: 0.05
-  terrainAmplitude: 10
+  targetSize: 10
+  optimalTemperature: 0.256
+  temperatureTolerance: 0.192
+  surfaceBlock: {fileID: 11400000, guid: 6a3f01ec2b88181458bbe8257a54512c, type: 2}
+  subSurfaceBlock: {fileID: 11400000, guid: d0c417f1261d8e54bbd3e0f09f75e11b, type: 2}
+  baseHeight: 20
+  terrainAmplitude: 25
+  terrainScale: 0.1

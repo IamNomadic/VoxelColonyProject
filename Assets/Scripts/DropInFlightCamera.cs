@@ -1,13 +1,15 @@
 using UnityEngine;
 
-[AddComponentMenu("Debug/External Camera Flight Rig - Custom Controls Updated")]
+[AddComponentMenu("Debug/External Camera Flight Rig - Snappy Movement")]
 public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 {
-    [Header("Interaction")]
+    [Header("Interaction & Hotbar")]
     public float interactionRange = 8f;
-    public BlockData blockToPlace; // Assign a BlockData asset here to place it!
+    [Tooltip("Drag blocks here to populate slots 1-5")]
+    public BlockData[] hotbar = new BlockData[5];
+    private int currentSlotIndex = 0;
 
-    // Reference to the world (auto-found)
+    // Reference to the world
     private VoxelWorld voxelWorld;
 
     [Header("External Camera")]
@@ -26,10 +28,16 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
     public float maxPitch = 89f;
     public bool lockCursor = true;
 
+    [Header("Collision Settings")]
+    public float playerRadius = 0.4f;
+    public LayerMask collisionMask;
+
+    // Internal State
     Rigidbody rb;
     float yaw;
     float pitch;
     Vector3 desiredVelocity;
+    bool isSprinting;
 
     void Awake()
     {
@@ -38,26 +46,23 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
         if (externalCamera == null && Camera.main != null)
             externalCamera = Camera.main.transform;
 
-        if (externalCamera == null)
-        {
-            Debug.LogError("No externalCamera assigned and no Camera.main found.");
-            enabled = false;
-            return;
-        }
-
         rb = GetComponent<Rigidbody>();
         if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
 
+        // Physics Setup
         rb.useGravity = false;
-        rb.isKinematic = false;
+        rb.isKinematic = true;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-        rb.detectCollisions = false;
-        rb.constraints = RigidbodyConstraints.None;
+
+        if (collisionMask == 0) collisionMask = -1;
 
         yaw = transform.eulerAngles.y;
-        float camPitch = externalCamera.eulerAngles.x;
-        pitch = camPitch > 180f ? camPitch - 360f : camPitch;
+        if (externalCamera != null)
+        {
+            float camPitch = externalCamera.eulerAngles.x;
+            pitch = camPitch > 180f ? camPitch - 360f : camPitch;
+        }
     }
 
     void OnEnable()
@@ -79,39 +84,74 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
     {
         HandleInput();
         HandleInteraction();
+        HandleHotbar();
+        CheckForSuffocation();
+    }
+
+    void CheckForSuffocation()
+    {
+        if (voxelWorld == null) return;
+        BlockData currentBlock = voxelWorld.GetBlock(transform.position);
+
+        if (currentBlock != null)
+        {
+            Vector3 surfacePos = FindSurface(transform.position);
+            transform.position = surfacePos;
+            desiredVelocity = Vector3.zero;
+        }
+    }
+
+    Vector3 FindSurface(Vector3 startPos)
+    {
+        int x = Mathf.FloorToInt(startPos.x);
+        int z = Mathf.FloorToInt(startPos.z);
+
+        for (int y = 128; y > 0; y--)
+        {
+            Vector3 checkPos = new Vector3(x + 0.5f, y, z + 0.5f);
+            if (voxelWorld.GetBlock(checkPos) == null)
+            {
+                Vector3 belowPos = new Vector3(x + 0.5f, y - 1, z + 0.5f);
+                if (voxelWorld.GetBlock(belowPos) != null)
+                {
+                    return new Vector3(startPos.x, y + 1.0f, startPos.z);
+                }
+            }
+        }
+        return startPos;
+    }
+
+    void HandleHotbar()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha1)) currentSlotIndex = 0;
+        if (Input.GetKeyDown(KeyCode.Alpha2)) currentSlotIndex = 1;
+        if (Input.GetKeyDown(KeyCode.Alpha3)) currentSlotIndex = 2;
+        if (Input.GetKeyDown(KeyCode.Alpha4)) currentSlotIndex = 3;
+        if (Input.GetKeyDown(KeyCode.Alpha5)) currentSlotIndex = 4;
+        if (currentSlotIndex >= hotbar.Length) currentSlotIndex = 0;
     }
 
     void HandleInteraction()
     {
-        // We need the VoxelWorld to do anything
-        if (voxelWorld == null) return;
+        if (voxelWorld == null || externalCamera == null) return;
 
-        // Raycast from camera center
         Ray ray = new Ray(externalCamera.position, externalCamera.forward);
 
-        // Left Click: Break (Set to Null)
         if (Input.GetMouseButtonDown(0))
         {
             if (Physics.Raycast(ray, out RaycastHit hit, interactionRange))
             {
-                // Move slightly INSIDE the block to get the coordinate of the block we hit
                 Vector3 targetPos = hit.point - (hit.normal * 0.1f);
                 voxelWorld.ModifyBlock(targetPos, null);
             }
         }
 
-        // Right Click: Place (Set to blockToPlace)
         if (Input.GetMouseButtonDown(1))
         {
+            BlockData blockToPlace = (hotbar != null && currentSlotIndex < hotbar.Length) ? hotbar[currentSlotIndex] : null;
             if (blockToPlace != null && Physics.Raycast(ray, out RaycastHit hit, interactionRange))
             {
-                // Move slightly OUTSIDE the block (along normal) to find the empty space adjacent
                 Vector3 targetPos = hit.point + (hit.normal * 0.1f);
-
-                // Optional: Don't place if player is inside that block
-                // Bounds playerBounds = GetComponent<Collider>().bounds;
-                // if (!playerBounds.Contains(targetPos)) ...
-
                 voxelWorld.ModifyBlock(targetPos, blockToPlace);
             }
         }
@@ -119,7 +159,7 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 
     void HandleInput()
     {
-        // Look input
+        // Look (Mouse)
         float mx = Input.GetAxis("Mouse X");
         float my = Input.GetAxis("Mouse Y") * (invertY ? 1f : -1f);
 
@@ -127,35 +167,47 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
         pitch += my * mouseSensitivity;
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
-        // Movement input
-        float forwardInput = Input.GetAxis("Vertical");
-        float rawStrafeInput = Input.GetAxis("Horizontal");
-        float strafeInput = -rawStrafeInput; // Inverted for this specific rig style if needed
+        // Movement (Keyboard)
+        // FIX: Used GetAxisRaw to prevent floaty/sliding stop
+        float forwardInput = Input.GetAxisRaw("Vertical");
+        float strafeInput = Input.GetAxisRaw("Horizontal");
 
-        // Vertical input
         float up = 0f;
         if (Input.GetKey(KeyCode.Space)) up += 1f;
         bool descend = Input.GetKey(KeyCode.CapsLock) || Input.GetKey(KeyCode.LeftControl);
         if (descend) up -= 1f;
 
-        // Sprint
-        float targetSpeed = moveSpeed;
-        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
-            targetSpeed *= sprintMultiplier;
+        isSprinting = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        float targetSpeed = isSprinting ? moveSpeed * sprintMultiplier : moveSpeed;
 
-        // Determine camera forward projected onto horizontal plane
         Vector3 camForward = externalCamera.forward;
-        camForward.y = 0f;
-        if (camForward.sqrMagnitude < 0.0001f) camForward = transform.forward;
-        camForward.Normalize();
+        Vector3 camRight = externalCamera.right;
 
-        Vector3 camRight = Vector3.Cross(Vector3.up, -camForward).normalized;
+        if (isSprinting)
+        {
+            // Free Flight
+            Vector3 flightMove = (camForward * forwardInput + camRight * strafeInput);
+            // Normalize so diagonal isn't faster
+            if (flightMove.sqrMagnitude > 1f) flightMove.Normalize();
+            desiredVelocity = flightMove * targetSpeed;
+        }
+        else
+        {
+            // Planar Hover
+            camForward.y = 0f;
+            camRight.y = 0f;
+            camForward.Normalize();
+            camRight.Normalize();
 
-        Vector3 horizontalMove = (camForward * forwardInput + camRight * strafeInput);
-        Vector3 horizVelocity = horizontalMove.sqrMagnitude > 0.000001f ? horizontalMove.normalized * targetSpeed : Vector3.zero;
-        Vector3 verticalVelocity = Vector3.up * (up * verticalSpeed);
+            Vector3 horizontalMove = (camForward * forwardInput + camRight * strafeInput);
+            // Normalize so diagonal isn't faster
+            if (horizontalMove.sqrMagnitude > 1f) horizontalMove.Normalize();
 
-        desiredVelocity = horizVelocity + verticalVelocity;
+            Vector3 horizVelocity = horizontalMove * targetSpeed;
+            Vector3 verticalVelocity = Vector3.up * (up * verticalSpeed);
+
+            desiredVelocity = horizVelocity + verticalVelocity;
+        }
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -166,15 +218,52 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 
     void FixedUpdate()
     {
-        Vector3 nextPos = rb.position + desiredVelocity * Time.fixedDeltaTime;
-        rb.MovePosition(nextPos);
+        // --- PREDICTIVE COLLISION LOGIC ---
 
+        Vector3 displacement = desiredVelocity * Time.fixedDeltaTime;
+        Vector3 finalPos = rb.position;
+
+        if (displacement.magnitude > 0.001f)
+        {
+            // Cast a sphere forward to see if we hit anything
+            if (Physics.SphereCast(rb.position, playerRadius, displacement.normalized, out RaycastHit hit, displacement.magnitude, collisionMask))
+            {
+                // Hit a wall - stop exactly at the wall surface
+                float distanceToMove = Mathf.Max(0, hit.distance - 0.01f);
+                finalPos = rb.position + (displacement.normalized * distanceToMove);
+            }
+            else
+            {
+                // Path is clear
+                finalPos = rb.position + displacement;
+            }
+        }
+
+        rb.MovePosition(finalPos);
+
+        // Rotation
         Quaternion rigRot = Quaternion.Euler(0f, yaw, 0f);
         rb.MoveRotation(rigRot);
 
-        Vector3 worldCamPos = rb.position + rigRot * cameraLocalOffset;
-        externalCamera.position = worldCamPos;
-        Quaternion camLocalPitch = Quaternion.Euler(pitch, 0f, 0f);
-        externalCamera.rotation = rigRot * camLocalPitch;
+        // Camera Follow
+        if (externalCamera != null)
+        {
+            Vector3 worldCamPos = rb.position + rigRot * cameraLocalOffset;
+            externalCamera.position = worldCamPos;
+            Quaternion camLocalPitch = Quaternion.Euler(pitch, 0f, 0f);
+            externalCamera.rotation = rigRot * camLocalPitch;
+        }
+    }
+
+    void OnGUI()
+    {
+        string blockName = "None";
+        if (hotbar != null && currentSlotIndex < hotbar.Length && hotbar[currentSlotIndex] != null)
+        {
+            blockName = hotbar[currentSlotIndex].blockName;
+        }
+
+        GUI.Label(new Rect(20, 20, 300, 50), $"Slot {currentSlotIndex + 1}: {blockName}");
+        if (isSprinting) GUI.Label(new Rect(20, 40, 300, 50), ">> TURBO <<");
     }
 }
