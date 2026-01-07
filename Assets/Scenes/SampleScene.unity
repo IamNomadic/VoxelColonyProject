@@ -464,9 +464,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 88fc9bbe7803c8145b9fe25f15e3abb0, type: 2}
   - {fileID: 11400000, guid: 445cc32129782e846aac359ab0f2491d, type: 2}
   - {fileID: 11400000, guid: 900338bdcedcea04f831ec42b4f55bec, type: 2}
-  temperatureScale: 0.5
+  temperatureScale: 0.1
   warpStrength: 15
   warpScale: 0.03
+  globalScale: 0.005
+  globalAmplitude: 30
+  globalHeightOffset: 0
 --- !u!4 &1387211311
 Transform:
   m_ObjectHideFlags: 0
@@ -535,10 +538,11 @@ MonoBehaviour:
   interactionRange: 8
   hotbar:
   - {fileID: 11400000, guid: d0c417f1261d8e54bbd3e0f09f75e11b, type: 2}
-  - {fileID: 11400000, guid: 735cff619ddc5f446b3b42d2250e0622, type: 2}
   - {fileID: 11400000, guid: 28f2ce4c08206644b9924f345157bdaa, type: 2}
-  - {fileID: 11400000, guid: 6e01aaccce73c1a4ca721b477919be5e, type: 2}
-  - {fileID: 11400000, guid: 6a3f01ec2b88181458bbe8257a54512c, type: 2}
+  - {fileID: 11400000, guid: c5f0a8ce3c19fa244b22726ffc4249b4, type: 2}
+  - {fileID: 11400000, guid: 219cba10c9b43354892cd564a133ee86, type: 2}
+  - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
+  saveSubFolder: SavedStructures
   externalCamera: {fileID: 330585546}
   cameraLocalOffset: {x: 0, y: 1.6, z: 0}
   moveSpeed: 10
@@ -552,7 +556,7 @@ MonoBehaviour:
   playerRadius: 0.4
   collisionMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
 --- !u!54 &1975112092
 Rigidbody:
   m_ObjectHideFlags: 0

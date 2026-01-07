@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Dirt
   m_EditorClassIdentifier: 
   blockName: Dirt
-  blockMaterial: {fileID: 2100000, guid: ec227086da64e024db3656ed8ac22d39, type: 2}
-  blockColor: {r: 0.7169812, g: 0.6228672, b: 0.5783197, a: 1}
+  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  blockColor: {r: 0.5660378, g: 0.39014912, b: 0.3337487, a: 1}
   blockScale: {x: 1, y: 1, z: 1}

@@ -22,3 +22,5 @@ MonoBehaviour:
   baseHeight: 20
   terrainAmplitude: 25
   terrainScale: 0.1
+  structures:
+  - {fileID: 11400000, guid: 09d458dc84fc334448bd5ebaee828e38, type: 2}

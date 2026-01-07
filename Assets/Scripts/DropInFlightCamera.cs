@@ -1,16 +1,23 @@
 using UnityEngine;
+using System.IO;
 
-[AddComponentMenu("Debug/External Camera Flight Rig - Snappy Movement")]
+[AddComponentMenu("Debug/External Camera Flight Rig - Scanner Mode")]
 public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 {
     [Header("Interaction & Hotbar")]
-    public float interactionRange = 8f;
+    public float interactionRange = 50f; // Increased for scanning large trees
     [Tooltip("Drag blocks here to populate slots 1-5")]
     public BlockData[] hotbar = new BlockData[5];
     private int currentSlotIndex = 0;
 
     // Reference to the world
     private VoxelWorld voxelWorld;
+
+    [Header("Structure Scanner")]
+    [Tooltip("Where to save files. Default is project root folder.")]
+    public string saveSubFolder = "SavedStructures";
+    private Vector3Int? pointA = null;
+    private Vector3Int? pointB = null;
 
     [Header("External Camera")]
     public Transform externalCamera;
@@ -85,8 +92,144 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
         HandleInput();
         HandleInteraction();
         HandleHotbar();
+        HandleScanner(); // New Feature
         CheckForSuffocation();
     }
+
+    // --- NEW: STRUCTURE SCANNER ---
+    void HandleScanner()
+    {
+        // Draw Selection Box
+        if (pointA.HasValue)
+        {
+            Vector3 p1 = pointA.Value;
+            // If B is set, use it; otherwise use mouse cursor block
+            Vector3 p2 = pointB.HasValue ? pointB.Value : GetLookBlockPos();
+
+            // Add 1 to max to encompass the full block
+            Vector3 min = Vector3.Min(p1, p2);
+            Vector3 max = Vector3.Max(p1, p2) + Vector3.one;
+
+            DrawBox(min, max, Color.green);
+        }
+
+        // 'Backquote' to Clear
+        if (Input.GetKeyDown(KeyCode.BackQuote))
+        {
+            pointA = null;
+            pointB = null;
+            Debug.Log("Selection Cleared.");
+        }
+
+        // 'F' to Select Points
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            Vector3Int hitPos = GetLookBlockPos();
+            if (hitPos.y != -999) // Valid hit
+            {
+                if (pointA == null)
+                {
+                    pointA = hitPos;
+                    Debug.Log($"Point A Set: {pointA}");
+                }
+                else
+                {
+                    pointB = hitPos;
+                    Debug.Log($"Point B Set: {pointB}. Press 'G' to Save.");
+                }
+            }
+        }
+
+        // 'G' to Save
+        if (Input.GetKeyDown(KeyCode.G) && pointA.HasValue && pointB.HasValue)
+        {
+            SaveStructure();
+        }
+    }
+
+    void SaveStructure()
+    {
+        if (voxelWorld == null) return;
+
+        // Calculate Bounds
+        Vector3Int min = Vector3Int.Min(pointA.Value, pointB.Value);
+        Vector3Int max = Vector3Int.Max(pointA.Value, pointB.Value);
+
+        VoxelStructure structData = new VoxelStructure();
+        structData.structureName = $"Structure_{System.DateTime.Now:MMdd_HHmm}";
+
+        Debug.Log($"Scanning volume from {min} to {max}...");
+        int count = 0;
+
+        // Loop through the box
+        for (int x = min.x; x <= max.x; x++)
+        {
+            for (int y = min.y; y <= max.y; y++)
+            {
+                for (int z = min.z; z <= max.z; z++)
+                {
+                    BlockData block = voxelWorld.GetBlock(new Vector3(x, y, z));
+                    if (block != null)
+                    {
+                        // Save RELATIVE position (0,0,0 is the bottom-left corner)
+                        structData.blocks.Add(new VoxelBlockEntry(x - min.x, y - min.y, z - min.z, block.blockName));
+                        count++;
+                    }
+                }
+            }
+        }
+
+        // Convert to JSON
+        string json = JsonUtility.ToJson(structData, true);
+
+        // Save File
+        string folderPath = Path.Combine(Application.dataPath, saveSubFolder); // Saves in Assets/SavedStructures
+        if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+
+        string fileName = $"{structData.structureName}.json";
+        string fullPath = Path.Combine(folderPath, fileName);
+
+        File.WriteAllText(fullPath, json);
+        Debug.Log($"<color=green>Saved {count} blocks to: {fullPath}</color>");
+
+        // Clear selection
+        pointA = null;
+        pointB = null;
+    }
+
+    Vector3Int GetLookBlockPos()
+    {
+        Ray ray = new Ray(externalCamera.position, externalCamera.forward);
+        if (Physics.Raycast(ray, out RaycastHit hit, interactionRange))
+        {
+            // Move slightly INTO the block to get its coordinate
+            Vector3 p = hit.point - (hit.normal * 0.1f);
+            return new Vector3Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y), Mathf.FloorToInt(p.z));
+        }
+        return new Vector3Int(0, -999, 0); // Error code
+    }
+
+    void DrawBox(Vector3 min, Vector3 max, Color color)
+    {
+        // Bottom
+        Debug.DrawLine(new Vector3(min.x, min.y, min.z), new Vector3(max.x, min.y, min.z), color);
+        Debug.DrawLine(new Vector3(min.x, min.y, min.z), new Vector3(min.x, min.y, max.z), color);
+        Debug.DrawLine(new Vector3(max.x, min.y, max.z), new Vector3(min.x, min.y, max.z), color);
+        Debug.DrawLine(new Vector3(max.x, min.y, max.z), new Vector3(max.x, min.y, min.z), color);
+
+        // Top
+        Debug.DrawLine(new Vector3(min.x, max.y, min.z), new Vector3(max.x, max.y, min.z), color);
+        Debug.DrawLine(new Vector3(min.x, max.y, min.z), new Vector3(min.x, max.y, max.z), color);
+        Debug.DrawLine(new Vector3(max.x, max.y, max.z), new Vector3(min.x, max.y, max.z), color);
+        Debug.DrawLine(new Vector3(max.x, max.y, max.z), new Vector3(max.x, max.y, min.z), color);
+
+        // Sides
+        Debug.DrawLine(new Vector3(min.x, min.y, min.z), new Vector3(min.x, max.y, min.z), color);
+        Debug.DrawLine(new Vector3(max.x, min.y, min.z), new Vector3(max.x, max.y, min.z), color);
+        Debug.DrawLine(new Vector3(min.x, min.y, max.z), new Vector3(min.x, max.y, max.z), color);
+        Debug.DrawLine(new Vector3(max.x, min.y, max.z), new Vector3(max.x, max.y, max.z), color);
+    }
+    // ----------------------------
 
     void CheckForSuffocation()
     {
@@ -135,31 +278,57 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
     {
         if (voxelWorld == null || externalCamera == null) return;
 
-        Ray ray = new Ray(externalCamera.position, externalCamera.forward);
-
-        if (Input.GetMouseButtonDown(0))
+        // Only run logic if we click
+        bool leftClick = Input.GetMouseButtonDown(0);
+        bool rightClick = Input.GetMouseButtonDown(1);
+       
+        if (leftClick || rightClick)
         {
-            if (Physics.Raycast(ray, out RaycastHit hit, interactionRange))
-            {
-                Vector3 targetPos = hit.point - (hit.normal * 0.1f);
-                voxelWorld.ModifyBlock(targetPos, null);
-            }
-        }
+            Ray ray = new Ray(externalCamera.position, externalCamera.forward);
 
-        if (Input.GetMouseButtonDown(1))
-        {
-            BlockData blockToPlace = (hotbar != null && currentSlotIndex < hotbar.Length) ? hotbar[currentSlotIndex] : null;
-            if (blockToPlace != null && Physics.Raycast(ray, out RaycastHit hit, interactionRange))
+            // 1. Get EVERYTHING the ray hits (Player, Trees, Ground, etc.)
+            RaycastHit[] hits = Physics.RaycastAll(ray, interactionRange, collisionMask);
+
+            // 2. Sort them by distance (closest first)
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            foreach (var hit in hits)
             {
-                Vector3 targetPos = hit.point + (hit.normal * 0.1f);
-                voxelWorld.ModifyBlock(targetPos, blockToPlace);
+                // 3. THE FIX: Ignore our own collider!
+                if (hit.collider.gameObject == gameObject) continue;
+
+                // 4. Ignore Trigger Zones (like checkpoints)
+                if (hit.collider.isTrigger) continue;
+
+                // We found a valid target (Terrain/Block)! 
+                Debug.Log($"Raycast Hit: {hit.collider.gameObject.name} at Distance: {hit.distance}");
+                // Break Block
+                if (leftClick)
+                {
+                    Vector3 targetPos = hit.point - (hit.normal * 0.1f);
+                    voxelWorld.ModifyBlock(targetPos, null);
+                    Debug.Log("BBBBRERREEEAAAAAAAAAACCCCK");
+                }
+
+                // Place Block
+                if (rightClick)
+                {
+                    BlockData blockToPlace = (hotbar != null && currentSlotIndex < hotbar.Length) ? hotbar[currentSlotIndex] : null;
+                    if (blockToPlace != null)
+                    {
+                        Vector3 targetPos = hit.point + (hit.normal * 0.1f);
+                        voxelWorld.ModifyBlock(targetPos, blockToPlace);
+                    }
+                }
+
+                // Stop after processing the first valid hit
+                return;
             }
         }
     }
 
     void HandleInput()
     {
-        // Look (Mouse)
         float mx = Input.GetAxis("Mouse X");
         float my = Input.GetAxis("Mouse Y") * (invertY ? 1f : -1f);
 
@@ -167,8 +336,6 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
         pitch += my * mouseSensitivity;
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
-        // Movement (Keyboard)
-        // FIX: Used GetAxisRaw to prevent floaty/sliding stop
         float forwardInput = Input.GetAxisRaw("Vertical");
         float strafeInput = Input.GetAxisRaw("Horizontal");
 
@@ -185,22 +352,18 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 
         if (isSprinting)
         {
-            // Free Flight
             Vector3 flightMove = (camForward * forwardInput + camRight * strafeInput);
-            // Normalize so diagonal isn't faster
             if (flightMove.sqrMagnitude > 1f) flightMove.Normalize();
             desiredVelocity = flightMove * targetSpeed;
         }
         else
         {
-            // Planar Hover
             camForward.y = 0f;
             camRight.y = 0f;
             camForward.Normalize();
             camRight.Normalize();
 
             Vector3 horizontalMove = (camForward * forwardInput + camRight * strafeInput);
-            // Normalize so diagonal isn't faster
             if (horizontalMove.sqrMagnitude > 1f) horizontalMove.Normalize();
 
             Vector3 horizVelocity = horizontalMove * targetSpeed;
@@ -218,34 +381,27 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
 
     void FixedUpdate()
     {
-        // --- PREDICTIVE COLLISION LOGIC ---
-
         Vector3 displacement = desiredVelocity * Time.fixedDeltaTime;
         Vector3 finalPos = rb.position;
 
         if (displacement.magnitude > 0.001f)
         {
-            // Cast a sphere forward to see if we hit anything
             if (Physics.SphereCast(rb.position, playerRadius, displacement.normalized, out RaycastHit hit, displacement.magnitude, collisionMask))
             {
-                // Hit a wall - stop exactly at the wall surface
                 float distanceToMove = Mathf.Max(0, hit.distance - 0.01f);
                 finalPos = rb.position + (displacement.normalized * distanceToMove);
             }
             else
             {
-                // Path is clear
                 finalPos = rb.position + displacement;
             }
         }
 
         rb.MovePosition(finalPos);
 
-        // Rotation
         Quaternion rigRot = Quaternion.Euler(0f, yaw, 0f);
         rb.MoveRotation(rigRot);
 
-        // Camera Follow
         if (externalCamera != null)
         {
             Vector3 worldCamPos = rb.position + rigRot * cameraLocalOffset;
@@ -263,7 +419,12 @@ public class ExternalCameraFlightRig_CustomControls_Updated : MonoBehaviour
             blockName = hotbar[currentSlotIndex].blockName;
         }
 
-        GUI.Label(new Rect(20, 20, 300, 50), $"Slot {currentSlotIndex + 1}: {blockName}");
-        if (isSprinting) GUI.Label(new Rect(20, 40, 300, 50), ">> TURBO <<");
+        string mode = "Flight";
+        if (pointA.HasValue) mode = "Selecting Point B...";
+        if (pointA.HasValue && pointB.HasValue) mode = "Selection READY (Press G)";
+
+        GUI.Label(new Rect(20, 20, 400, 30), $"Mode: {mode}");
+        GUI.Label(new Rect(20, 40, 400, 30), $"Slot {currentSlotIndex + 1}: {blockName}");
+        if (isSprinting) GUI.Label(new Rect(20, 60, 400, 30), ">> TURBO <<");
     }
 }

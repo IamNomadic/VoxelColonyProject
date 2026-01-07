@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Grass
   m_EditorClassIdentifier: 
   blockName: Grass
-  blockMaterial: {fileID: 2100000, guid: ec227086da64e024db3656ed8ac22d39, type: 2}
+  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
   blockColor: {r: 0.33895844, g: 0.6415094, b: 0.2753649, a: 1}
   blockScale: {x: 1, y: 1, z: 1}
