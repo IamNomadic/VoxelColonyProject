@@ -467,8 +467,8 @@ MonoBehaviour:
   temperatureScale: 0.1
   warpStrength: 15
   warpScale: 0.03
-  globalScale: 0.005
-  globalAmplitude: 30
+  globalScale: 0.01
+  globalAmplitude: 50
   globalHeightOffset: 0
 --- !u!4 &1387211311
 Transform:
@@ -501,6 +501,7 @@ GameObject:
   - component: {fileID: 1975112088}
   - component: {fileID: 1975112091}
   - component: {fileID: 1975112092}
+  - component: {fileID: 1975112093}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -542,6 +543,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: c5f0a8ce3c19fa244b22726ffc4249b4, type: 2}
   - {fileID: 11400000, guid: 219cba10c9b43354892cd564a133ee86, type: 2}
   - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
+  currentSlotIndex: 0
+  isInputLocked: 0
   saveSubFolder: SavedStructures
   externalCamera: {fileID: 330585546}
   cameraLocalOffset: {x: 0, y: 1.6, z: 0}
@@ -584,6 +587,20 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &1975112093
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975112087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aaddd1732e27c6428c8636203d1d55a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  iconSize: 100
+  padding: 10
 --- !u!1 &2107636295 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}

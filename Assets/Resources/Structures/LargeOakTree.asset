@@ -10,10 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9eaae9a8d89fc5a48b89a8c7bf433f46, type: 3}
-  m_Name: Cactus
+  m_Name: LargeOakTree
   m_EditorClassIdentifier: 
-  structureJson: {fileID: 4900000, guid: de3827fd0cceb1f4883385f196b42160, type: 3}
+  structureJson: {fileID: 4900000, guid: 78a64dd6e352be545a794a7d27d42437, type: 3}
   blockPalette:
-  - {fileID: 11400000, guid: 2b3d72736b1587f45bae17976fdeee28, type: 2}
+  - {fileID: 11400000, guid: 219cba10c9b43354892cd564a133ee86, type: 2}
+  - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
   yOffset: 0
-  spawnDensity: 0.0046
+  spawnDensity: 0.001

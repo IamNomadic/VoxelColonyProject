@@ -1,0 +1,641 @@
+{
+    "structureName": "Structure_0107_1644",
+    "blocks": [
+        {
+            "x": 0,
+            "y": 5,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 6,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 6,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 6,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 7,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 7,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 7,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 8,
+            "z": 1,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 0,
+            "y": 8,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 0,
+            "y": 8,
+            "z": 3,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 0,
+            "y": 9,
+            "z": 2,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 0,
+            "y": 11,
+            "z": 4,
+            "blockName": "Grass"
+        },
+        {
+            "x": 1,
+            "y": 4,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 5,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 5,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 5,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 6,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 6,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 6,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 6,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 6,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 7,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 7,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 7,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 7,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 7,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 8,
+            "z": 0,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 1,
+            "y": 8,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 8,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 8,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 8,
+            "z": 4,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 1,
+            "y": 9,
+            "z": 1,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 1,
+            "y": 9,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 1,
+            "y": 9,
+            "z": 3,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 1,
+            "y": 10,
+            "z": 2,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 1,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 2,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 3,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 4,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 4,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 4,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 5,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 5,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 5,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 5,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 5,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 6,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 6,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 6,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 6,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 6,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 8,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 8,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 8,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 8,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 8,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 9,
+            "z": 0,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 2,
+            "y": 9,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 9,
+            "z": 2,
+            "blockName": "SpruceWood"
+        },
+        {
+            "x": 2,
+            "y": 9,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 9,
+            "z": 4,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 2,
+            "y": 10,
+            "z": 1,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 2,
+            "y": 10,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 2,
+            "y": 10,
+            "z": 3,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 2,
+            "y": 11,
+            "z": 2,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 3,
+            "y": 4,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 5,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 5,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 5,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 6,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 6,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 6,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 6,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 6,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "z": 0,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "z": 4,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 8,
+            "z": 0,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 3,
+            "y": 8,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 8,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 8,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 8,
+            "z": 4,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 3,
+            "y": 9,
+            "z": 1,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 3,
+            "y": 9,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 3,
+            "y": 9,
+            "z": 3,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 3,
+            "y": 10,
+            "z": 2,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 4,
+            "y": 5,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 6,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 6,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 6,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 7,
+            "z": 1,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 7,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 7,
+            "z": 3,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 8,
+            "z": 1,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 4,
+            "y": 8,
+            "z": 2,
+            "blockName": "SpruceLeaves"
+        },
+        {
+            "x": 4,
+            "y": 8,
+            "z": 3,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 4,
+            "y": 9,
+            "z": 2,
+            "blockName": "FlatSnow"
+        },
+        {
+            "x": 5,
+            "y": 0,
+            "z": 0,
+            "blockName": "Grass"
+        }
+    ]
+}

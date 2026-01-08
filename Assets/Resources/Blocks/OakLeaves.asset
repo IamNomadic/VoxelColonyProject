@@ -10,9 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 670d1da1f5a87064b97b4c7d04330481, type: 3}
-  m_Name: Snow
+  m_Name: OakLeaves
   m_EditorClassIdentifier: 
-  blockName: Grass
+  blockName: OakLeaves
   blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
-  blockColor: {r: 1, g: 1, b: 1, a: 1}
+  blockColor: {r: 0.2084762, g: 0.754717, b: 0.16731933, a: 1}
   blockScale: {x: 1, y: 1, z: 1}
+  height: 1
+  isTransparent: 0
+  topUV: {x: 0, y: 0}
+  sideUV: {x: 0, y: 0}
+  bottomUV: {x: 0, y: 0}

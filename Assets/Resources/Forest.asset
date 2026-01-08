@@ -24,3 +24,4 @@ MonoBehaviour:
   terrainScale: 0.05
   structures:
   - {fileID: 11400000, guid: feaac327ba53183429ec82676ee363d5, type: 2}
+  - {fileID: 11400000, guid: feaac327ba53183429ec82676ee363d5, type: 2}
