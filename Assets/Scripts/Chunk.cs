@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-// --- HELPER CLASS ---
 public class MeshData
 {
     public List<Vector3> vertices = new List<Vector3>();
@@ -23,53 +22,75 @@ public class MeshData
 [RequireComponent(typeof(MeshCollider))]
 public class Chunk : MonoBehaviour
 {
-    // --- SETTINGS ---
     public const int CHUNK_SIZE = 16;
     public const int CHUNK_HEIGHT = 128;
+    public const byte MAX_LIQUID = 255;
 
-    // --- INTERNAL DATA ---
     public Vector2Int chunkCoord;
-    private BlockData[,,] blocks = new BlockData[CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE];
-    private MeshData meshData = new MeshData();
 
-    // PERFORMANCE FIX: Cache the world reference!
+    private BlockData[,,] blocks = new BlockData[CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE];
+    private byte[,,] fluidLevels = new byte[CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE];
+
+    // Two separate meshes
+    private MeshData terrainMesh = new MeshData();
+    private MeshData liquidMesh = new MeshData();
+
+    private MeshFilter terrainFilter;
+    private MeshCollider terrainCollider;
+    private GameObject liquidObj;
+    private MeshFilter liquidFilter;
+    private MeshRenderer liquidRenderer;
+
     private VoxelWorld world;
 
-    // --- INITIALIZATION ---
     void Awake()
     {
-        if (GetComponent<MeshFilter>() == null) gameObject.AddComponent<MeshFilter>();
+        terrainFilter = GetComponent<MeshFilter>();
+        terrainCollider = GetComponent<MeshCollider>();
         if (GetComponent<MeshRenderer>() == null) gameObject.AddComponent<MeshRenderer>();
-        if (GetComponent<MeshCollider>() == null) gameObject.AddComponent<MeshCollider>();
+
+        liquidObj = new GameObject("LiquidLayer");
+        liquidObj.transform.parent = transform;
+        liquidObj.transform.localPosition = Vector3.zero;
+
+        liquidFilter = liquidObj.AddComponent<MeshFilter>();
+        liquidRenderer = liquidObj.AddComponent<MeshRenderer>();
     }
 
     void Start()
     {
-        // 1. CACHE THE WORLD HERE (The Speed Fix)
         world = FindObjectOfType<VoxelWorld>();
-
-        if (world != null && world.defaultMaterial != null)
+        if (world != null)
         {
             GetComponent<MeshRenderer>().material = world.defaultMaterial;
+            liquidRenderer.material = world.defaultMaterial;
         }
     }
 
-    // --- DATA ACCESS ---
+    // --- LIQUID API ---
+    public byte GetFluidLevel(int x, int y, int z)
+    {
+        if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_HEIGHT && z >= 0 && z < CHUNK_SIZE)
+            return fluidLevels[x, y, z];
+        return 0;
+    }
+
+    public void SetFluidLevel(int x, int y, int z, byte level)
+    {
+        if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_HEIGHT && z >= 0 && z < CHUNK_SIZE)
+            fluidLevels[x, y, z] = level;
+    }
+
     public BlockData GetBlock(int x, int y, int z)
     {
-        // Optimization: Check local bounds first to avoid method calls
         if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_HEIGHT && z >= 0 && z < CHUNK_SIZE)
-        {
             return blocks[x, y, z];
-        }
 
-        // Optimization: Use cached World reference instead of finding it every time
         if (world != null)
         {
             Vector3 worldPos = transform.position + new Vector3(x, y, z);
             return world.GetBlock(worldPos);
         }
-
         return null;
     }
 
@@ -77,69 +98,140 @@ public class Chunk : MonoBehaviour
     {
         if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_HEIGHT && z >= 0 && z < CHUNK_SIZE)
         {
+            BlockData prev = blocks[x, y, z];
+
+            // 1. Deregister old source if we are breaking a tap
+            if (prev != null && prev.isWaterSource)
+            {
+                LiquidSimulator.Instance?.RemoveSource(this, x, y, z);
+            }
+
             blocks[x, y, z] = block;
+
+            // ... (Your existing fluid initialization logic) ...
+            if (block == null) fluidLevels[x, y, z] = 0;
+            else if (block.isLiquid) fluidLevels[x, y, z] = MAX_LIQUID;
+            else fluidLevels[x, y, z] = MAX_LIQUID;
+
+            // 2. Register new source if we are placing a tap
+            if (block != null && block.isWaterSource)
+            {
+                LiquidSimulator.Instance?.AddSource(this, x, y, z);
+            }
+
+            // ... (Your existing WakeNeighbors logic) ...
+            if (prev != block && (LiquidSimulator.Instance == null || !LiquidSimulator.Instance.isRunningUpdate))
+            {
+                WakeNeighbors(x, y, z);
+            }
         }
+    }
+
+    public void WakeNeighbors(int x, int y, int z)
+    {
+        LiquidSimulator.Instance?.WakeUpArea(this, x, y, z);
     }
 
     // --- MESH GENERATION ---
     public void RegenerateMesh()
     {
-        meshData.Clear();
+        terrainMesh.Clear();
+        liquidMesh.Clear();
 
-        // Loop Logic Optimized:
-        // We access the array directly for the center block to skip the safety check overhead
         for (int x = 0; x < CHUNK_SIZE; x++)
         {
             for (int y = 0; y < CHUNK_HEIGHT; y++)
             {
                 for (int z = 0; z < CHUNK_SIZE; z++)
                 {
-                    BlockData block = blocks[x, y, z]; // Direct Access (Fast)
+                    BlockData block = blocks[x, y, z];
                     if (block == null) continue;
+
+                    MeshData targetMesh = block.isLiquid ? liquidMesh : terrainMesh;
+
+                    float h;
+                    if (block.isLiquid)
+                    {
+                        // Check if block ABOVE is also liquid for seamless vertical flow
+                        BlockData above = GetBlock(x, y + 1, z);
+                        if (above != null && above.isLiquid)
+                        {
+                            h = 1.0f;
+                        }
+                        else
+                        {
+                            h = (float)fluidLevels[x, y, z] / MAX_LIQUID;
+                        }
+                    }
+                    else
+                    {
+                        h = block.height;
+                    }
+
+                    if (h <= 0.01f) continue;
 
                     Vector3 pos = new Vector3(x, y, z);
 
-                    // Check neighbors
-                    if (ShouldDrawFace(x, y + 1, z, block.height))
-                        AddFace(pos, Vector3.up, block, block.height);
+                    // Pass amILiquid flag to ShouldDrawFace
+                    if (ShouldDrawFace(x, y + 1, z, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.up, block, h);
 
-                    if (ShouldDrawFace(x, y - 1, z, block.height))
-                        AddFace(pos, Vector3.down, block, block.height);
+                    if (ShouldDrawFace(x, y - 1, z, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.down, block, h);
 
-                    if (ShouldDrawFace(x - 1, y, z, block.height))
-                        AddFace(pos, Vector3.left, block, block.height);
+                    if (ShouldDrawFace(x - 1, y, z, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.left, block, h);
 
-                    if (ShouldDrawFace(x + 1, y, z, block.height))
-                        AddFace(pos, Vector3.right, block, block.height);
+                    if (ShouldDrawFace(x + 1, y, z, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.right, block, h);
 
-                    if (ShouldDrawFace(x, y, z + 1, block.height))
-                        AddFace(pos, Vector3.forward, block, block.height);
+                    if (ShouldDrawFace(x, y, z + 1, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.forward, block, h);
 
-                    if (ShouldDrawFace(x, y, z - 1, block.height))
-                        AddFace(pos, Vector3.back, block, block.height);
+                    if (ShouldDrawFace(x, y, z - 1, h, block.isLiquid))
+                        AddFace(targetMesh, pos, Vector3.back, block, h);
                 }
             }
         }
 
-        UpdateMesh();
+        UpdateMeshes();
     }
 
-    bool ShouldDrawFace(int x, int y, int z, float myHeight)
+    bool ShouldDrawFace(int x, int y, int z, float myHeight, bool amILiquid)
     {
-        // We still use the safe GetBlock here because neighbors might be out of bounds
         BlockData neighbor = GetBlock(x, y, z);
-
         if (neighbor == null) return true;
-        if (neighbor.isTransparent) return true;
-        if (neighbor.height < 1.0f) return true;
-        return false;
+
+        // --- LOGIC IF I AM WATER ---
+        if (amILiquid)
+        {
+            if (neighbor.isLiquid)
+            {
+                float nHeight = (float)GetFluidLevel(x, y, z) / MAX_LIQUID;
+                // Only draw if the neighbor is significantly lower
+                if (nHeight >= myHeight - 0.01f) return false;
+                return true;
+            }
+            if (!neighbor.isTransparent) return false;
+            return true;
+        }
+
+        // --- LOGIC IF I AM SOLID ---
+        else
+        {
+            // Always draw solid faces against liquid
+            if (neighbor.isLiquid) return true;
+            if (neighbor.isTransparent) return true;
+            if (neighbor.height < 1.0f) return true;
+            return false;
+        }
     }
 
-    void AddFace(Vector3 pos, Vector3 dir, BlockData block, float h)
+    void AddFace(MeshData target, Vector3 pos, Vector3 dir, BlockData block, float h)
     {
         Vector3 tl, tr, bl, br;
 
-        // Vertices (Fixed Winding)
+        // Vertex Definitions (Unchanged)
         if (dir == Vector3.up)
         {
             tl = pos + new Vector3(0, h, 1); tr = pos + new Vector3(1, h, 1);
@@ -171,98 +263,58 @@ public class Chunk : MonoBehaviour
             bl = pos + new Vector3(0, 0, 0); br = pos + new Vector3(0, 0, 1);
         }
 
-        int vCount = meshData.vertices.Count;
-        meshData.vertices.Add(tl); meshData.vertices.Add(tr);
-        meshData.vertices.Add(bl); meshData.vertices.Add(br);
+        int vCount = target.vertices.Count;
+        target.vertices.Add(tl); target.vertices.Add(tr);
+        target.vertices.Add(bl); target.vertices.Add(br);
 
-        // Triangles (Fixed Winding Logic)
+        // --- TRIANGLE WINDING FIXED ---
         if (dir == Vector3.up)
         {
-            // Top Face: Clockwise
-            meshData.triangles.Add(vCount);
-            meshData.triangles.Add(vCount + 1);
-            meshData.triangles.Add(vCount + 2);
-
-            meshData.triangles.Add(vCount + 2);
-            meshData.triangles.Add(vCount + 1);
-            meshData.triangles.Add(vCount + 3);
+            // Clockwise (Standard)
+            target.triangles.Add(vCount); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2);
+            target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 3);
+        }
+        else if (dir == Vector3.down)
+        {
+            // Clockwise (0->1->2 produces Down Normal for these specific verts)
+            // PREVIOUS BUG WAS HERE (0->2->1)
+            target.triangles.Add(vCount); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2);
+            target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 3);
         }
         else
         {
-            // Side/Bottom Faces: Flipped for Outward Facing
-            meshData.triangles.Add(vCount);
-            meshData.triangles.Add(vCount + 2);
-            meshData.triangles.Add(vCount + 1);
-
-            meshData.triangles.Add(vCount + 1);
-            meshData.triangles.Add(vCount + 2);
-            meshData.triangles.Add(vCount + 3);
+            // Sides (Clockwise relative to face normal)
+            target.triangles.Add(vCount); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1);
+            target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3);
         }
 
-        // Colors
         Color c = block.blockColor;
         if (c.a == 0) c.a = 1f;
+        target.colors.Add(c); target.colors.Add(c); target.colors.Add(c); target.colors.Add(c);
 
-        meshData.colors.Add(c); meshData.colors.Add(c);
-        meshData.colors.Add(c); meshData.colors.Add(c);
-
-        // UVs
-        Vector2 texturePos = Vector2.zero;
-        if (dir == Vector3.up) texturePos = block.topUV;
-        else if (dir == Vector3.down) texturePos = block.bottomUV;
-        else texturePos = block.sideUV;
-
-        if (texturePos != Vector2.zero)
-        {
-            float tileWidth = 0.1f;
-            float tileHeight = 0.1f;
-            float currentHeight = (dir == Vector3.up || dir == Vector3.down) ? 1.0f : h;
-
-            Vector2 uvBL = texturePos;
-            Vector2 uvTL = texturePos + new Vector2(0, tileHeight * currentHeight);
-            Vector2 uvBR = texturePos + new Vector2(tileWidth, 0);
-            Vector2 uvTR = texturePos + new Vector2(tileWidth, tileHeight * currentHeight);
-
-            meshData.uvs.Add(uvTL); meshData.uvs.Add(uvTR);
-            meshData.uvs.Add(uvBL); meshData.uvs.Add(uvBR);
-        }
-        else
-        {
-            meshData.uvs.Add(new Vector2(0, 1));
-            meshData.uvs.Add(new Vector2(1, 1));
-            meshData.uvs.Add(new Vector2(0, 0));
-            meshData.uvs.Add(new Vector2(1, 0));
-        }
+        target.uvs.Add(new Vector2(0, 1)); target.uvs.Add(new Vector2(1, 1));
+        target.uvs.Add(new Vector2(0, 0)); target.uvs.Add(new Vector2(1, 0));
     }
-
-    void UpdateMesh()
+    public void UpdateMeshes()
     {
-        MeshFilter filter = GetComponent<MeshFilter>();
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
-        MeshCollider collider = GetComponent<MeshCollider>();
+        Mesh tMesh = terrainFilter.sharedMesh;
+        if (tMesh == null) { tMesh = new Mesh(); terrainFilter.sharedMesh = tMesh; }
+        tMesh.Clear();
+        tMesh.vertices = terrainMesh.vertices.ToArray();
+        tMesh.triangles = terrainMesh.triangles.ToArray();
+        tMesh.uv = terrainMesh.uvs.ToArray();
+        tMesh.colors = terrainMesh.colors.ToArray();
+        tMesh.RecalculateNormals();
+        if (tMesh.vertexCount > 0) terrainCollider.sharedMesh = tMesh;
+        else terrainCollider.sharedMesh = null;
 
-        Mesh mesh = filter.sharedMesh;
-        if (mesh == null)
-        {
-            mesh = new Mesh();
-            filter.sharedMesh = mesh;
-        }
-
-        mesh.Clear();
-        mesh.vertices = meshData.vertices.ToArray();
-        mesh.triangles = meshData.triangles.ToArray();
-        mesh.uv = meshData.uvs.ToArray();
-        mesh.colors = meshData.colors.ToArray();
-
-        mesh.RecalculateNormals();
-
-        if (mesh.vertexCount > 0)
-        {
-            collider.sharedMesh = mesh;
-        }
-        else
-        {
-            collider.sharedMesh = null;
-        }
+        Mesh lMesh = liquidFilter.sharedMesh;
+        if (lMesh == null) { lMesh = new Mesh(); liquidFilter.sharedMesh = lMesh; }
+        lMesh.Clear();
+        lMesh.vertices = liquidMesh.vertices.ToArray();
+        lMesh.triangles = liquidMesh.triangles.ToArray();
+        lMesh.uv = liquidMesh.uvs.ToArray();
+        lMesh.colors = liquidMesh.colors.ToArray();
+        lMesh.RecalculateNormals();
     }
 }

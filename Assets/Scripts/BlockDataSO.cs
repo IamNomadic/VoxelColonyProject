@@ -5,12 +5,13 @@ public class BlockData : ScriptableObject
 {
     [Header("Identity")]
     public string blockName;
-
+    public bool isWaterSource = false; // Add this!
     [Header("Original Settings")]
     public Material blockMaterial;
     public Color blockColor = Color.white;
     public Vector3 blockScale = Vector3.one;
-
+    [Header("Physics / Gameplay")]
+    public bool isLiquid = false; // Add this line!
     [Header("Shape Settings (New)")]
     [Range(0.1f, 1.0f)]
     [Tooltip("1.0 = Full Block. 0.5 = Slab. 0.25 = Snow Layer.")]

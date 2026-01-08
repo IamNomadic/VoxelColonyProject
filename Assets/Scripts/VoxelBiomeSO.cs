@@ -22,7 +22,7 @@ public class VoxelBiomeSO : ScriptableObject
     public int terrainAmplitude = 10;
     public float terrainScale = 0.05f;
 
-    [Header("5. Decorations")]
-    [Tooltip("List of structures (Trees, Rocks, Ruins) that can spawn here.")]
-    public List<StructureDataSO> structures;
+    [Header("5. Decorations (Groups)")]
+    [Tooltip("List of structure groups (e.g. 'Oak Forest', 'Rock Scatter').")]
+    public List<StructureGroupSO> structureGroups;
 }

@@ -17,4 +17,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 219cba10c9b43354892cd564a133ee86, type: 2}
   - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
   yOffset: 0
-  spawnDensity: 0.001
+  spawnDensity: 0.1
+  spawnRadius: 3
+  usePatchGeneration: 1
+  patchScale: 0.05
+  patchThreshold: 0.498

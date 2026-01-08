@@ -1,24 +1,35 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-[CreateAssetMenu(menuName = "Voxel/Structure/Imported Structure")]
+[CreateAssetMenu(fileName = "NewBlockData", menuName = "Voxel/Structure/Imported Structure")]
 public class StructureDataSO : ScriptableObject
 {
     [Header("Data Source")]
-    [Tooltip("Drag your .json file here (Must be inside Assets folder).")]
     public TextAsset structureJson;
 
     [Header("Translation Palette")]
-    [Tooltip("List ALL blocks used in this structure so we can look them up by name.")]
     public List<BlockData> blockPalette;
 
     [Header("Spawn Rules")]
-    [Tooltip("Move the structure down? (e.g. -1 to bury roots).")]
     public int yOffset = 0;
 
-    [Tooltip("Chance to spawn in valid biome (0.01 = 1% chance per block).")]
     [Range(0f, 0.1f)]
     public float spawnDensity = 0.01f;
+
+    [Tooltip("How much space to reserve around this structure (prevents overlapping).")]
+    public int spawnRadius = 3;
+
+    // --- NEW: PATCH SETTINGS ---
+    [Header("Patch Generation")]
+    [Tooltip("If true, structures spawn in clumps/forests based on noise.")]
+    public bool usePatchGeneration = false;
+
+    [Tooltip("Low value (0.01) = Huge Forests. High value (0.2) = Small clumps.")]
+    public float patchScale = 0.05f;
+
+    [Tooltip("Values > 0.5 mean patches are rarer. Values < 0.5 mean patches are common.")]
+    [Range(0.1f, 0.9f)]
+    public float patchThreshold = 0.5f;
 
     // --- CACHE ---
     private Dictionary<Vector3Int, BlockData> cachedStructure;
@@ -30,17 +41,14 @@ public class StructureDataSO : ScriptableObject
 
         cachedStructure = new Dictionary<Vector3Int, BlockData>();
 
-        // 1. Parse JSON
         VoxelStructure data = JsonUtility.FromJson<VoxelStructure>(structureJson.text);
 
-        // 2. Build Lookup Dictionary for Palette
         Dictionary<string, BlockData> paletteLookup = new Dictionary<string, BlockData>();
         foreach (var b in blockPalette)
         {
             if (b != null) paletteLookup[b.blockName] = b;
         }
 
-        // 3. Convert
         foreach (var entry in data.blocks)
         {
             if (paletteLookup.TryGetValue(entry.blockName, out BlockData block))

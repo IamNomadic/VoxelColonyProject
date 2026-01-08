@@ -144,10 +144,16 @@ public class VoxelWorld : MonoBehaviour
     {
         Random.InitState(System.DateTime.Now.Millisecond);
 
+        // 1. Create Occupation Map
+        bool[,] occupiedMap = new bool[width, depth];
+
         for (int x = 0; x < width; x++)
         {
             for (int z = 0; z < depth; z++)
             {
+                if (occupiedMap[x, z]) continue;
+
+                // Biome Lookup (Same as before)
                 float warpX = (Mathf.PerlinNoise((x + warpOffset) * warpScale, (z + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
                 float warpZ = (Mathf.PerlinNoise((z + warpOffset) * warpScale, (x + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
 
@@ -156,17 +162,70 @@ public class VoxelWorld : MonoBehaviour
 
                 VoxelBiomeSO biome = biomes[chunkBiomeMap[biomeCX, biomeCZ]];
 
-                if (biome.structures == null || biome.structures.Count == 0) continue;
+                if (biome.structureGroups == null || biome.structureGroups.Count == 0) continue;
 
-                foreach (var structure in biome.structures)
+                foreach (var group in biome.structureGroups)
                 {
-                    if (Random.value < structure.spawnDensity)
+                    // --- GRADIENT DENSITY LOGIC ---
+                    float finalSpawnChance = 1.0f;
+
+                    if (group.usePatchGeneration)
+                    {
+                        float noiseVal = Mathf.PerlinNoise(
+                            (x + warpOffset + group.GetHashCode()) * group.patchScale,
+                            (z + warpOffset + group.GetHashCode()) * group.patchScale
+                        );
+
+                        // If below threshold, 0% chance (Empty Area)
+                        if (noiseVal < group.patchThreshold)
+                        {
+                            finalSpawnChance = 0f;
+                        }
+                        else
+                        {
+                            // Math: Map the noise from [Threshold -> 1.0] to [0.0 -> 1.0]
+                            // This creates the "Fade" at the edges.
+                            // Edge of forest = Low Chance. Center of forest = High Chance.
+                            float range = 1.0f - group.patchThreshold;
+                            float strength = (noiseVal - group.patchThreshold) / range;
+
+                            // Optional: Curve it to make centers tighter (Strength ^ 2)
+                            finalSpawnChance = strength;
+                        }
+                    }
+
+                    // If chance is 0, skip immediately
+                    if (finalSpawnChance <= 0.001f) continue;
+
+                    // 2. Pick Random Structure
+                    StructureDataSO structure = group.GetRandomStructure();
+                    if (structure == null) continue;
+
+                    // 3. Roll Dice (Structure Density * Gradient Strength)
+                    // If we are at the edge, finalSpawnChance might be 0.1, making spawns very rare.
+                    if (Random.value < (structure.spawnDensity * finalSpawnChance))
                     {
                         int surfaceY = GetSurfaceHeightAt(x, z);
                         BlockData ground = GetBlockDataOnly(x, surfaceY, z);
+
                         if (ground == biome.surfaceBlock)
                         {
                             SpawnStructure(x, surfaceY + 1 + structure.yOffset, z, structure);
+
+                            // Mark Footprint
+                            int r = structure.spawnRadius;
+                            for (int ox = -r; ox <= r; ox++)
+                            {
+                                for (int oz = -r; oz <= r; oz++)
+                                {
+                                    int mapX = x + ox;
+                                    int mapZ = z + oz;
+                                    if (mapX >= 0 && mapX < width && mapZ >= 0 && mapZ < depth)
+                                    {
+                                        occupiedMap[mapX, mapZ] = true;
+                                    }
+                                }
+                            }
                             break;
                         }
                     }
@@ -174,7 +233,6 @@ public class VoxelWorld : MonoBehaviour
             }
         }
     }
-
     void SpawnStructure(int rootX, int rootY, int rootZ, StructureDataSO structureData)
     {
         var blocks = structureData.GetStructure();
@@ -327,6 +385,15 @@ public class VoxelWorld : MonoBehaviour
                 if (chunkBiomeMap[next.x, next.y] == -1) { chunkBiomeMap[next.x, next.y] = biomeIndex; q.Enqueue(next); size++; }
             }
         }
+    }
+    // Add this to VoxelWorld.cs
+    public Chunk GetChunkByCoord(int cx, int cz)
+    {
+        if (chunks.TryGetValue(new Vector2Int(cx, cz), out Chunk c))
+        {
+            return c;
+        }
+        return null;
     }
     int PickBiomeForTemperature(float temp)
     {

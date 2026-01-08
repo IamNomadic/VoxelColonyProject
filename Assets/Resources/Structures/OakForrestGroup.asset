@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9cc423f625e24b4c9e09d6e06bdb0c7, type: 3}
+  m_Name: OakForrestGroup
+  m_EditorClassIdentifier: 
+  usePatchGeneration: 1
+  patchScale: 0.1
+  patchThreshold: 0.607
+  structures:
+  - structure: {fileID: 11400000, guid: 31842e78156bee24da109c7a6e92239c, type: 2}
+    weight: 1
+  - structure: {fileID: 11400000, guid: feaac327ba53183429ec82676ee363d5, type: 2}
+    weight: 2
+  - structure: {fileID: 11400000, guid: dc9c81cd8a1d12f4b96e2a50b284bb70, type: 2}
+    weight: 1
