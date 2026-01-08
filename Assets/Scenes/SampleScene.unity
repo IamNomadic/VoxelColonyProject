@@ -437,6 +437,7 @@ GameObject:
   - component: {fileID: 1387211311}
   - component: {fileID: 1387211310}
   - component: {fileID: 1387211312}
+  - component: {fileID: 1387211313}
   m_Layer: 0
   m_Name: VoxelCreator
   m_TagString: Untagged
@@ -506,6 +507,20 @@ MonoBehaviour:
   maxMovesBeforeDeath: 12
   maxUpdatesPerFrame: 5000
   isRunningUpdate: 0
+--- !u!114 &1387211313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1387211309}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17b3d8eea014f4a49becfeea455980ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  worldMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  loadedBlocks: []
 --- !u!1 &1931128544 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2658411621565627148, guid: 397d5e0618b9a914189b9bf9281246f8, type: 3}
@@ -566,6 +581,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
   currentSlotIndex: 0
   isInputLocked: 0
+  pawnLayer:
+    serializedVersion: 2
+    m_Bits: 2048
+  selectedPawn: {fileID: 0}
+  commanderMode: 0
   saveSubFolder: SavedStructures
   externalCamera: {fileID: 330585546}
   cameraLocalOffset: {x: 0, y: 1.6, z: 0}
@@ -627,6 +647,11 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}
   m_PrefabInstance: {fileID: 5276855648857352647}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &2770019971303838066 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 762685147521527599, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+  m_PrefabInstance: {fileID: 9119234364180731800}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4408978095469631721
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -681,7 +706,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
+      propertyPath: populationList.Array.size
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
       propertyPath: populationList.Array.data[0].prefab
@@ -692,12 +721,20 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2107636295}
     - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
+      propertyPath: populationList.Array.data[2].prefab
+      value: 
+      objectReference: {fileID: 2770019971303838066}
+    - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
       propertyPath: populationList.Array.data[0].density
-      value: 1.5
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
       propertyPath: populationList.Array.data[1].density
-      value: 0.72
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2099891421446386234, guid: d4b98d4926fea84498f9a64128954edc, type: 3}
+      propertyPath: populationList.Array.data[2].density
+      value: 0.1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -715,6 +752,10 @@ PrefabInstance:
     - target: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}
       propertyPath: m_Name
       value: PredatorPawn
+      objectReference: {fileID: 0}
+    - target: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}
+      propertyPath: m_Layer
+      value: 11
       objectReference: {fileID: 0}
     - target: {fileID: 1662005451802745811, guid: 51914d19a2eb45442831b74076b7d476, type: 3}
       propertyPath: m_LocalPosition.x
@@ -773,6 +814,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PreyPawn
       objectReference: {fileID: 0}
+    - target: {fileID: 2658411621565627148, guid: 397d5e0618b9a914189b9bf9281246f8, type: 3}
+      propertyPath: m_Layer
+      value: 11
+      objectReference: {fileID: 0}
     - target: {fileID: 7571160351426496706, guid: 397d5e0618b9a914189b9bf9281246f8, type: 3}
       propertyPath: m_LocalPosition.x
       value: 104.47411
@@ -818,6 +863,71 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 397d5e0618b9a914189b9bf9281246f8, type: 3}
+--- !u!1001 &9119234364180731800
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 762685147521527599, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_Name
+      value: DronePawn
+      objectReference: {fileID: 0}
+    - target: {fileID: 762685147521527599, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_Layer
+      value: 11
+      objectReference: {fileID: 0}
+    - target: {fileID: 2824982717581149329, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: initialState
+      value: 
+      objectReference: {fileID: 11400000, guid: ee7b4046f40605448b6d42684804e82f, type: 2}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 104.47411
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 50.67
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 127.188
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4883790275746546006, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fdb61f004ab9d6d41b766caf4e7cc129, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -828,5 +938,6 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 1975112088}
   - {fileID: 8452656741488862293}
+  - {fileID: 9119234364180731800}
   - {fileID: 5276855648857352647}
   - {fileID: 4408978095469631721}

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic; // Required for Queue
 
 public class PawnContext
 {
@@ -9,13 +10,18 @@ public class PawnContext
     public Animator animator;
     public VoxelWorld world;
 
-    // THE NEW DATA SOURCE
     public PawnDataSO data;
 
     // Runtime Data
     public Vector3 currentGridTarget;
     public float stateTimer;
     public float lastTransitionTime;
+
+    // --- NEW: COMMAND QUEUE SYSTEM ---
+    // The target currently being pursued
+    public Vector3? currentCommandTarget = null;
+    // The list of future targets
+    public Queue<Vector3> commandQueue = new Queue<Vector3>();
 
     // Sensor Cache
     private float lastScanTime;
@@ -30,19 +36,20 @@ public class PawnContext
         world = w;
         animator = a;
         data = d;
+
+        // Initialize Queue
+        commandQueue = new Queue<Vector3>();
     }
 
-    // --- UPDATED SENSOR LOGIC ---
     public void SetTargetAndSnap(Vector3 rawPosition)
     {
         float ix = Mathf.Floor(rawPosition.x);
         float iy = Mathf.Floor(rawPosition.y);
         float iz = Mathf.Floor(rawPosition.z);
 
-        // Read offset from DATA now
         currentGridTarget = new Vector3(
             ix + 0.5f,
-            iy + data.verticalOffset,
+            iy + data.verticalOffset, // Uses PawnDataSO
             iz + 0.5f
         );
     }
@@ -57,18 +64,14 @@ public class PawnContext
         lastScanTime = Time.time;
         cachedTarget = null;
 
-        // Scan using data.sightRadius
-        Collider[] hits = Physics.OverlapSphere(transform.position, data.sightRadius);
+        Collider[] hits = Physics.OverlapSphere(transform.position, data.sightRadius); // Uses PawnDataSO
         float closestDist = float.MaxValue;
 
         foreach (var hit in hits)
         {
             if (hit.gameObject == gameObject) continue;
 
-            // FIX: We now look for the StateMachine, because PawnIdentity is gone
             var otherPawn = hit.GetComponent<PawnStateMachine>();
-
-            // Access data through the StateMachine
             if (otherPawn != null && otherPawn.Data != null && otherPawn.Data.type == searchType)
             {
                 float d = Vector3.Distance(transform.position, hit.transform.position);

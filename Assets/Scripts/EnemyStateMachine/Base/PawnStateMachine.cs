@@ -1,20 +1,16 @@
 ﻿using UnityEngine;
 
-// Removed [RequireComponent(typeof(PawnIdentity))]
 [RequireComponent(typeof(Rigidbody))]
 public class PawnStateMachine : MonoBehaviour
 {
     [Header("Configuration")]
-    [Tooltip("Drag the Data Profile (Stats/Species) here.")]
     [SerializeField] private PawnDataSO pawnData;
-
-    [Tooltip("The AI State Logic.")]
     [SerializeField] private PawnStateSO initialState;
+
+    // Debug view
     public PawnStateSO CURRENTSTATE;
-    // Public Accessor for Sensors (So other pawns can read my type)
     public PawnDataSO Data => pawnData;
 
-    // Internal
     private PawnStateSO currentStateInstance;
     private PawnContext ctx;
     private bool hasLanded = false;
@@ -32,12 +28,29 @@ public class PawnStateMachine : MonoBehaviour
         var rb = GetComponent<Rigidbody>();
         var anim = GetComponent<Animator>();
 
-        // Initialize Context with DATA
-        ctx = new PawnContext(transform, rb, world, anim, pawnData);
-
-        // Apply Debug Color immediately
+        ctx = new PawnContext(transform, rb, world, anim, pawnData); // Initialize Context
         UpdateColor();
     }
+
+    // --- NEW: COMMANDER API ---
+    public void QueueCommand(Vector3 target)
+    {
+        if (ctx != null)
+        {
+            ctx.commandQueue.Enqueue(target);
+            Debug.Log($"{name} received order. Queue size: {ctx.commandQueue.Count}");
+        }
+    }
+
+    public void ClearCommands()
+    {
+        if (ctx != null)
+        {
+            ctx.commandQueue.Clear();
+            ctx.currentCommandTarget = null;
+        }
+    }
+    // ---------------------------
 
     void Update()
     {
@@ -50,6 +63,7 @@ public class PawnStateMachine : MonoBehaviour
 
         if (currentStateInstance == null) return;
 
+        // Transition Logic
         if (currentStateInstance.Transitions != null)
         {
             foreach (var t in currentStateInstance.Transitions)
@@ -77,9 +91,9 @@ public class PawnStateMachine : MonoBehaviour
 
     private void HandleGravity()
     {
-        // Read gravity speed from DATA
         transform.position += Vector3.down * pawnData.gravitySpeed * Time.deltaTime;
 
+        // Gravity/Landing Logic
         if (VoxelPathHelper.IsWalkable(ctx.world, transform.position, checkPawns: false))
         {
             hasLanded = true;
