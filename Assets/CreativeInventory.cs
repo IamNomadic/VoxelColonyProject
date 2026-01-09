@@ -3,125 +3,165 @@ using System.Collections.Generic;
 
 public class CreativeInventory : MonoBehaviour
 {
-    [Header("Settings")]
-    public float iconSize = 100f;
-    public float padding = 10f;
+    [Header("References")]
+    public GameModeController gameController;
+    public int iconSize = 50;
+    public int padding = 10;
 
-    // --- INTERNAL DATA ---
-    private BlockData[] allBlocks;
-    private bool isMenuOpen = false;
-    private ExternalCameraFlightRig_CustomControls_Updated flightRig;
+    private bool showInventory = false;
+    private List<BlockData> allBlocks = new List<BlockData>();
+    private Vector2 scrollPosition;
 
     void Start()
     {
-        // 1. Auto-Load all blocks from "Assets/Resources/Blocks"
-        allBlocks = Resources.LoadAll<BlockData>("Blocks");
-        Debug.Log($"[CreativeInventory] Loaded {allBlocks.Length} blocks from Resources/Blocks.");
+        if (gameController == null) gameController = FindObjectOfType<GameModeController>();
 
-        // 2. Find the Flight Rig to communicate with it
-        flightRig = GetComponent<ExternalCameraFlightRig_CustomControls_Updated>();
+        // Load Blocks
+        if (BlockManager.Instance != null)
+        {
+            // Skip Air (0)
+            for (byte i = 1; i < 255; i++)
+            {
+                BlockData b = BlockManager.Instance.GetBlockData(i);
+                if (b != null) allBlocks.Add(b);
+                else break;
+            }
+        }
     }
 
     void Update()
     {
-        // Toggle Menu with TAB
+        // 1. Safety Check: If we switched out of Builder Mode, force close inventory
+        if (showInventory && !(gameController.ActiveMode is Mode_Builder))
+        {
+            SetInventoryState(false);
+        }
+
+        // 2. Toggle Input (CHANGED TO TAB)
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            isMenuOpen = !isMenuOpen;
-            UpdateCursorState();
+            // ONLY allow opening if we are in Builder Mode
+            if (gameController.ActiveMode is Mode_Builder)
+            {
+                SetInventoryState(!showInventory);
+            }
+            else
+            {
+                Debug.Log("Inventory is only available in Builder Mode.");
+            }
         }
     }
 
-    void UpdateCursorState()
+    // Helper method to keep code clean
+    void SetInventoryState(bool isOpen)
     {
-        if (isMenuOpen)
-        {
-            // Unlock cursor for menu use
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+        showInventory = isOpen;
 
-            // Disable camera movement while menu is open
-            if (flightRig != null) flightRig.isInputLocked = true;
+        if (showInventory)
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+            if (gameController != null && gameController.movement != null)
+                gameController.movement.InputLocked = true;
         }
         else
         {
-            // Lock cursor back to game
-            if (flightRig != null && flightRig.lockCursor)
-            {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-            }
-
-            // Re-enable camera movement
-            if (flightRig != null) flightRig.isInputLocked = false;
+            Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            if (gameController != null && gameController.movement != null)
+                gameController.movement.InputLocked = false;
         }
     }
 
     void OnGUI()
     {
-        if (!isMenuOpen) return;
+        if (!showInventory) return;
+        if (gameController == null) return;
 
-        // Draw a dark background
-        GUI.Box(new Rect(0, 0, Screen.width, Screen.height), "");
+        // Background
+        GUI.Box(new Rect(50, 50, Screen.width - 100, Screen.height - 100), "Block Library (Hover and press 1-5 to assign)");
 
-        // --- GRID LAYOUT ---
-        float x = padding;
-        float y = padding;
-        float width = Screen.width - (padding * 2);
+        // Scroll View
+        GUILayout.BeginArea(new Rect(70, 80, Screen.width - 140, Screen.height - 140));
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
 
-        GUI.Label(new Rect(x, y, width, 30), "<b>CREATIVE MENU</b> (Hover + Press 1-5 to Assign)");
-        y += 40;
+        // Grid Layout
+        int columns = Mathf.FloorToInt((Screen.width - 140) / (iconSize + padding));
+        if (columns < 1) columns = 1;
 
-        foreach (var block in allBlocks)
+        int index = 0;
+        while (index < allBlocks.Count)
         {
-            if (block == null) continue;
-
-            Rect btnRect = new Rect(x, y, iconSize, iconSize);
-
-            // Draw Block Box
-            GUI.Box(btnRect, block.blockName);
-
-            // Draw Color Preview
-            Rect colorRect = new Rect(x + 10, y + 25, iconSize - 20, iconSize - 40);
-            Color originalColor = GUI.color;
-            GUI.color = block.blockColor;
-            GUI.DrawTexture(colorRect, Texture2D.whiteTexture);
-            GUI.color = originalColor;
-
-            // --- HOVER LOGIC ---
-            if (btnRect.Contains(Event.current.mousePosition))
+            GUILayout.BeginHorizontal();
+            for (int i = 0; i < columns; i++)
             {
-                // Highlight
-                GUI.Box(btnRect, "Selecting...");
+                if (index >= allBlocks.Count) break;
 
-                // Detect Number Keys (1-5) to Assign
-                if (Event.current.isKey && Event.current.type == EventType.KeyDown)
+                BlockData b = allBlocks[index];
+
+                // 1. Draw the Button
+                if (GUILayout.Button(b.blockName, GUILayout.Width(iconSize), GUILayout.Height(iconSize)))
                 {
-                    KeyCode key = Event.current.keyCode;
-                    if (key >= KeyCode.Alpha1 && key <= KeyCode.Alpha5)
+                    // Standard Click: Assign to CURRENT selected slot
+                    int current = gameController.currentSlotIndex;
+                    gameController.sharedHotbar[current] = b;
+                    Debug.Log($"Assigned {b.blockName} to Selected Slot ({current + 1})");
+                }
+
+                // 2. Hover & Hotkey Logic
+                Rect btnRect = GUILayoutUtility.GetLastRect();
+
+                if (btnRect.Contains(Event.current.mousePosition))
+                {
+                    if (Event.current.isKey && Event.current.type == EventType.KeyDown)
                     {
-                        int slotIndex = key - KeyCode.Alpha1; // '1' is 49, so 49-49 = 0
-                        AssignBlockToHotbar(slotIndex, block);
+                        if (Event.current.keyCode == KeyCode.Alpha1) AssignToSlot(0, b);
+                        else if (Event.current.keyCode == KeyCode.Alpha2) AssignToSlot(1, b);
+                        else if (Event.current.keyCode == KeyCode.Alpha3) AssignToSlot(2, b);
+                        else if (Event.current.keyCode == KeyCode.Alpha4) AssignToSlot(3, b);
+                        else if (Event.current.keyCode == KeyCode.Alpha5) AssignToSlot(4, b);
                     }
                 }
-            }
 
-            // Grid Math (Move to next column, wrap to next row)
-            x += iconSize + padding;
-            if (x + iconSize > Screen.width)
-            {
-                x = padding;
-                y += iconSize + padding;
+                index++;
             }
+            GUILayout.EndHorizontal();
         }
+
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+
+        DrawHotbarPreview();
     }
 
-    void AssignBlockToHotbar(int slot, BlockData block)
+    void AssignToSlot(int slotIndex, BlockData block)
     {
-        if (flightRig != null)
+        gameController.sharedHotbar[slotIndex] = block;
+        Debug.Log($"Quick-Assigned {block.blockName} to Slot {slotIndex + 1}");
+        Event.current.Use();
+    }
+
+    void DrawHotbarPreview()
+    {
+        int barWidth = 300;
+        int startX = (Screen.width - barWidth) / 2;
+        int y = Screen.height - 60;
+
+        for (int i = 0; i < 5; i++)
         {
-            flightRig.hotbar[slot] = block;
-            Debug.Log($"Assigned {block.blockName} to Slot {slot + 1}");
+            BlockData b = gameController.sharedHotbar[i];
+            string name = (b != null) ? b.blockName : "Empty";
+
+            if (i == gameController.currentSlotIndex)
+                GUI.color = Color.yellow;
+            else
+                GUI.color = Color.white;
+
+            if (GUI.Button(new Rect(startX + (i * 60), y, 50, 50), $"{i + 1}\n{name}"))
+            {
+                gameController.currentSlotIndex = i;
+            }
         }
+        GUI.color = Color.white;
     }
 }

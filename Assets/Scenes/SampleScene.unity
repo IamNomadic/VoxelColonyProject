@@ -538,6 +538,7 @@ GameObject:
   - component: {fileID: 1975112091}
   - component: {fileID: 1975112092}
   - component: {fileID: 1975112093}
+  - component: {fileID: 1975112094}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -572,21 +573,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee11ffd44d6fefe4eba1620e69f2f542, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  interactionRange: 8
-  hotbar:
-  - {fileID: 11400000, guid: d0c417f1261d8e54bbd3e0f09f75e11b, type: 2}
-  - {fileID: 11400000, guid: 28f2ce4c08206644b9924f345157bdaa, type: 2}
-  - {fileID: 11400000, guid: c5f0a8ce3c19fa244b22726ffc4249b4, type: 2}
-  - {fileID: 11400000, guid: 219cba10c9b43354892cd564a133ee86, type: 2}
-  - {fileID: 11400000, guid: 5af2b190cb257684e8a745a12292d26c, type: 2}
-  currentSlotIndex: 0
-  isInputLocked: 0
-  pawnLayer:
-    serializedVersion: 2
-    m_Bits: 2048
-  selectedPawn: {fileID: 0}
-  commanderMode: 0
-  saveSubFolder: SavedStructures
   externalCamera: {fileID: 330585546}
   cameraLocalOffset: {x: 0, y: 1.6, z: 0}
   moveSpeed: 10
@@ -596,7 +582,6 @@ MonoBehaviour:
   invertY: 0
   minPitch: -89
   maxPitch: 89
-  lockCursor: 1
   playerRadius: 0.4
   collisionMask:
     serializedVersion: 2
@@ -640,8 +625,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3aaddd1732e27c6428c8636203d1d55a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  iconSize: 100
+  gameController: {fileID: 1975112094}
+  iconSize: 50
   padding: 10
+--- !u!114 &1975112094
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975112087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fc62a0fbc69a074f9dcf481eb5594dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactionRange: 20
+  interactionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  world: {fileID: 0}
+  movement: {fileID: 0}
+  mainCamera: {fileID: 330585545}
+  sharedHotbar:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  currentSlotIndex: 0
 --- !u!1 &2107636295 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}

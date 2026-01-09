@@ -33,12 +33,13 @@ public class PawnStateMachine : MonoBehaviour
     }
 
     // --- NEW: COMMANDER API ---
-    public void QueueCommand(Vector3 target)
+    // --- UPDATED COMMANDER API ---
+    public void QueueCommand(Vector3 target, OrderType type)
     {
         if (ctx != null)
         {
-            ctx.commandQueue.Enqueue(target);
-            Debug.Log($"{name} received order. Queue size: {ctx.commandQueue.Count}");
+            ctx.orderQueue.Enqueue(new PawnOrder { target = target, type = type });
+            Debug.Log($"{name} received {type} order. Queue size: {ctx.orderQueue.Count}");
         }
     }
 
@@ -46,8 +47,8 @@ public class PawnStateMachine : MonoBehaviour
     {
         if (ctx != null)
         {
-            ctx.commandQueue.Clear();
-            ctx.currentCommandTarget = null;
+            ctx.orderQueue.Clear();
+            ctx.currentOrder = null;
         }
     }
     // ---------------------------

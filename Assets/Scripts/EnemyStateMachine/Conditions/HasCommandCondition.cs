@@ -1,16 +1,16 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Pawn/Conditions/Has Command")]
-public class Condition_HasCommand : PawnConditionSO
+public class Condition_HasOrders : PawnConditionSO
 {
-    [Tooltip("If true, returns True when commands exist. If false, returns True when queue is empty.")]
+    [Tooltip("If true, returns True when queue is EMPTY.")]
     public bool invert = false;
 
     public override bool Evaluate(PawnContext ctx)
     {
-        // We have a command if we are currently moving to one OR if there are more in the queue
-        bool hasCommand = (ctx.currentCommandTarget != null) || (ctx.commandQueue.Count > 0);
+        // FIX: Check the NEW 'orderQueue', not the old 'commandQueue'
+        bool hasOrders = (ctx.currentOrder != null) || (ctx.orderQueue.Count > 0);
 
-        return invert ? !hasCommand : hasCommand;
+        return invert ? !hasOrders : hasOrders;
     }
 }

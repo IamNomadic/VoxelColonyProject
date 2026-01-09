@@ -1,5 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic; // Required for Queue
+public enum OrderType { Move, Break }
+
+public struct PawnOrder
+{
+    public Vector3 target;
+    public OrderType type;
+}
 
 public class PawnContext
 {
@@ -27,7 +34,10 @@ public class PawnContext
     private float lastScanTime;
     private Transform cachedTarget;
     private const float SCAN_INTERVAL = 0.5f;
-
+  
+    // Inside PawnContext class...
+    public PawnOrder? currentOrder = null;
+    public Queue<PawnOrder> orderQueue = new Queue<PawnOrder>();
     public PawnContext(Transform t, Rigidbody r, VoxelWorld w, Animator a, PawnDataSO d)
     {
         transform = t;
