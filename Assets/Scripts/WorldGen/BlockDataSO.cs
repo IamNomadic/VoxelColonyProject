@@ -5,32 +5,35 @@ public class BlockData : ScriptableObject
 {
     [Header("Identity")]
     public string blockName;
-    public bool isWaterSource = false; // Add this!
+    public bool isWaterSource = false;
+
     [Header("Original Settings")]
     public Material blockMaterial;
     public Color blockColor = Color.white;
     public Vector3 blockScale = Vector3.one;
-    [Header("Physics / Gameplay")]
-    public bool isLiquid = false; // Add this line!
-    [Header("Shape Settings (New)")]
-    [Range(0.1f, 1.0f)]
-    [Tooltip("1.0 = Full Block. 0.5 = Slab. 0.25 = Snow Layer.")]
-    public float height = 1.0f;
 
-    [Tooltip("If true, neighbors will draw faces against this (e.g. Glass, Leaves, Slabs).")]
+    [Header("Physics / Gameplay")]
+    public bool isLiquid = false;
+
+    [Header("Shape Settings")]
+    [Range(0.1f, 1.0f)]
+    public float height = 1.0f;
     public bool isTransparent = false;
 
-    [Header("Texture Coordinates (Optional)")]
-    // If you use a Texture Atlas, set these. If using simple Colors, leave as (0,0).
+    [Header("Micro-Model (New)")]
+    [Tooltip("If assigned, the chunk will render this 8x8x8 model instead of a simple cube.")]
+    public VoxelModelSO voxelModel;
+
+    [Header("Texture Coordinates")]
     public Vector2 topUV;
     public Vector2 sideUV;
     public Vector2 bottomUV;
 
-    // Helper to make the dictionary key reliable (Original Logic + Height check)
     public override int GetHashCode()
     {
         int hash = blockMaterial != null ? blockMaterial.GetHashCode() : blockColor.GetHashCode();
-        // We include height in the hash so a Slab is treated as different from a Full Block
+        // Include model in identity check so chunks regenerate if model changes
+        if (voxelModel != null) hash ^= voxelModel.GetHashCode();
         return hash * 23 + height.GetHashCode();
     }
 }
