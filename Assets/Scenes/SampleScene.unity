@@ -521,6 +521,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   worldMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
   loadedBlocks: []
+  colorPalette: []
 --- !u!1 &1931128544 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2658411621565627148, guid: 397d5e0618b9a914189b9bf9281246f8, type: 3}

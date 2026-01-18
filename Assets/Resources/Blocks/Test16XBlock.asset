@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 670d1da1f5a87064b97b4c7d04330481, type: 3}
+  m_Name: Test16XBlock
+  m_EditorClassIdentifier: 
+  blockName: 16TestBench
+  isWaterSource: 0
+  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  blockColor: {r: 0.33895844, g: 0.6415094, b: 0.2753649, a: 1}
+  blockScale: {x: 1, y: 1, z: 1}
+  isLiquid: 0
+  height: 1
+  isTransparent: 0
+  voxelModel: {fileID: 11400000, guid: 15a527382d2e4e243a34cda8635a4da7, type: 2}
+  topUV: {x: 0, y: 0}
+  sideUV: {x: 0, y: 0}
+  bottomUV: {x: 0, y: 0}

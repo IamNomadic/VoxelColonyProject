@@ -5,124 +5,140 @@ public class CreativeInventory : MonoBehaviour
 {
     [Header("References")]
     public GameModeController gameController;
-    public int iconSize = 50;
-    public int padding = 10;
+    public int iconSize = 40;
+    public int padding = 2;
 
     private bool showInventory = false;
-    private List<BlockData> allBlocks = new List<BlockData>();
     private Vector2 scrollPosition;
+
+    // 0 = Standard, 1 = Color Palette
+    private int currentTab = 0;
+
+    private List<BlockData> standardBlocks = new List<BlockData>();
+    private List<BlockData> colorBlocks = new List<BlockData>();
+
+    // --- VISUALS ---
+    private Texture2D solidTexture;
+    private GUIStyle flatButtonStyle;
 
     void Start()
     {
         if (gameController == null) gameController = FindObjectOfType<GameModeController>();
 
-        // Load Blocks
+        // 1. Create a 1x1 White Texture for solid rendering
+        solidTexture = new Texture2D(1, 1);
+        solidTexture.SetPixel(0, 0, Color.white);
+        solidTexture.Apply();
+
+        RefreshLists();
+    }
+
+    // Helper to create the style once (Performance)
+    void InitStyles()
+    {
+        if (flatButtonStyle == null)
+        {
+            flatButtonStyle = new GUIStyle(GUI.skin.button);
+            flatButtonStyle.normal.background = solidTexture; // Remove default grey gradient
+            flatButtonStyle.active.background = solidTexture;
+            flatButtonStyle.hover.background = solidTexture;
+            flatButtonStyle.border = new RectOffset(1, 1, 1, 1); // Slight border definition
+            flatButtonStyle.margin = new RectOffset(padding / 2, padding / 2, padding / 2, padding / 2);
+        }
+    }
+
+    void RefreshLists()
+    {
+        standardBlocks.Clear();
+        colorBlocks.Clear();
+
         if (BlockManager.Instance != null)
         {
-            // Skip Air (0)
-            for (byte i = 1; i < 255; i++)
+            if (BlockManager.Instance.colorPalette != null)
+                colorBlocks.AddRange(BlockManager.Instance.colorPalette);
+
+            foreach (var b in BlockManager.Instance.loadedBlocks)
             {
-                BlockData b = BlockManager.Instance.GetBlockData(i);
-                if (b != null) allBlocks.Add(b);
-                else break;
+                if (!colorBlocks.Contains(b))
+                    standardBlocks.Add(b);
             }
         }
     }
 
     void Update()
     {
-        // 1. Safety Check: If we switched out of Builder Mode, force close inventory
         if (showInventory && !(gameController.ActiveMode is Mode_Builder))
-        {
             SetInventoryState(false);
-        }
 
-        // 2. Toggle Input (CHANGED TO TAB)
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            // ONLY allow opening if we are in Builder Mode
             if (gameController.ActiveMode is Mode_Builder)
-            {
                 SetInventoryState(!showInventory);
-            }
-            else
-            {
-                Debug.Log("Inventory is only available in Builder Mode.");
-            }
         }
     }
 
-    // Helper method to keep code clean
     void SetInventoryState(bool isOpen)
     {
         showInventory = isOpen;
+        Cursor.visible = showInventory;
+        Cursor.lockState = showInventory ? CursorLockMode.None : CursorLockMode.Locked;
+        if (gameController != null && gameController.movement != null)
+            gameController.movement.InputLocked = showInventory;
 
-        if (showInventory)
-        {
-            Cursor.visible = true;
-            Cursor.lockState = CursorLockMode.None;
-            if (gameController != null && gameController.movement != null)
-                gameController.movement.InputLocked = true;
-        }
-        else
-        {
-            Cursor.visible = false;
-            Cursor.lockState = CursorLockMode.Locked;
-            if (gameController != null && gameController.movement != null)
-                gameController.movement.InputLocked = false;
-        }
+        if (isOpen) RefreshLists();
     }
 
     void OnGUI()
     {
         if (!showInventory) return;
-        if (gameController == null) return;
+        InitStyles(); // Ensure styles are ready
 
-        // Background
-        GUI.Box(new Rect(50, 50, Screen.width - 100, Screen.height - 100), "Block Library (Hover and press 1-5 to assign)");
+        Rect windowRect = new Rect(50, 50, Screen.width - 100, Screen.height - 100);
 
-        // Scroll View
-        GUILayout.BeginArea(new Rect(70, 80, Screen.width - 140, Screen.height - 140));
+        // --- 1. OPAQUE BACKGROUND ---
+        // Draw a solid dark box behind the UI to prevent world bleed-through
+        Color oldColor = GUI.color;
+        GUI.color = new Color(0.15f, 0.15f, 0.15f, 1.0f); // Solid Dark Grey
+        GUI.DrawTexture(windowRect, solidTexture);
+        GUI.color = oldColor; // Reset
+
+        // Draw the standard Frame on top
+        GUI.Box(windowRect, "Creative Library");
+
+        // --- TABS ---
+        GUILayout.BeginArea(new Rect(windowRect.x + 20, windowRect.y + 30, windowRect.width - 40, 40));
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Standard Blocks", GUILayout.Height(30))) currentTab = 0;
+        if (GUILayout.Button($"Color Palette ({colorBlocks.Count})", GUILayout.Height(30))) currentTab = 1;
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+
+        // --- SCROLL VIEW ---
+        Rect scrollRect = new Rect(windowRect.x + 20, windowRect.y + 80, windowRect.width - 40, windowRect.height - 140);
+
+        if (currentTab == 0) DrawStandardGrid(scrollRect);
+        else DrawColorGrid(scrollRect);
+
+        // --- HOTBAR ---
+        DrawHotbarPreview();
+    }
+
+    void DrawStandardGrid(Rect area)
+    {
+        GUILayout.BeginArea(area);
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
 
-        // Grid Layout
-        int columns = Mathf.FloorToInt((Screen.width - 140) / (iconSize + padding));
+        int columns = Mathf.FloorToInt((area.width - 20) / (iconSize + padding));
         if (columns < 1) columns = 1;
 
         int index = 0;
-        while (index < allBlocks.Count)
+        while (index < standardBlocks.Count)
         {
             GUILayout.BeginHorizontal();
             for (int i = 0; i < columns; i++)
             {
-                if (index >= allBlocks.Count) break;
-
-                BlockData b = allBlocks[index];
-
-                // 1. Draw the Button
-                if (GUILayout.Button(b.blockName, GUILayout.Width(iconSize), GUILayout.Height(iconSize)))
-                {
-                    // Standard Click: Assign to CURRENT selected slot
-                    int current = gameController.currentSlotIndex;
-                    gameController.sharedHotbar[current] = b;
-                    Debug.Log($"Assigned {b.blockName} to Selected Slot ({current + 1})");
-                }
-
-                // 2. Hover & Hotkey Logic
-                Rect btnRect = GUILayoutUtility.GetLastRect();
-
-                if (btnRect.Contains(Event.current.mousePosition))
-                {
-                    if (Event.current.isKey && Event.current.type == EventType.KeyDown)
-                    {
-                        if (Event.current.keyCode == KeyCode.Alpha1) AssignToSlot(0, b);
-                        else if (Event.current.keyCode == KeyCode.Alpha2) AssignToSlot(1, b);
-                        else if (Event.current.keyCode == KeyCode.Alpha3) AssignToSlot(2, b);
-                        else if (Event.current.keyCode == KeyCode.Alpha4) AssignToSlot(3, b);
-                        else if (Event.current.keyCode == KeyCode.Alpha5) AssignToSlot(4, b);
-                    }
-                }
-
+                if (index >= standardBlocks.Count) break;
+                DrawBlockButton(standardBlocks[index], true); // Standard Button Style
                 index++;
             }
             GUILayout.EndHorizontal();
@@ -130,15 +146,87 @@ public class CreativeInventory : MonoBehaviour
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
-
-        DrawHotbarPreview();
     }
 
-    void AssignToSlot(int slotIndex, BlockData block)
+    void DrawColorGrid(Rect area)
     {
-        gameController.sharedHotbar[slotIndex] = block;
-        Debug.Log($"Quick-Assigned {block.blockName} to Slot {slotIndex + 1}");
-        Event.current.Use();
+        GUILayout.BeginArea(area);
+
+        // Calculate exact content width for 32 columns
+        // Note: We use 'iconSize' directly here because custom style handles margins internally
+        float contentWidth = 32 * (iconSize + padding);
+
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, GUILayout.Width(area.width), GUILayout.Height(area.height));
+
+        GUILayout.BeginVertical(GUILayout.Width(contentWidth));
+
+        int index = 0;
+        while (index < colorBlocks.Count)
+        {
+            GUILayout.BeginHorizontal();
+            for (int i = 0; i < 32; i++)
+            {
+                if (index >= colorBlocks.Count)
+                {
+                    GUILayout.Space(iconSize + padding);
+                }
+                else
+                {
+                    DrawBlockButton(colorBlocks[index], false); // Flat Button Style
+                    index++;
+                }
+            }
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    void DrawBlockButton(BlockData b, bool isStandard)
+    {
+        string btnText = isStandard ? b.blockName : "";
+        Color originalBg = GUI.backgroundColor;
+
+        if (!isStandard)
+        {
+            // Set the background color for our white texture
+            GUI.backgroundColor = b.blockColor;
+
+            // Check Hover for Tooltip
+            if (new Rect(GUILayoutUtility.GetLastRect()).Contains(Event.current.mousePosition))
+            {
+                GUI.Label(new Rect(Event.current.mousePosition.x + 15, Event.current.mousePosition.y, 100, 20), b.blockName);
+            }
+        }
+
+        // --- BUTTON DRAWING ---
+        // If Standard: Use default skin. If Color: Use our Flat Opaque Style.
+        bool clicked = false;
+        if (isStandard)
+            clicked = GUILayout.Button(btnText, GUILayout.Width(iconSize), GUILayout.Height(iconSize));
+        else
+            clicked = GUILayout.Button(btnText, flatButtonStyle, GUILayout.Width(iconSize), GUILayout.Height(iconSize));
+
+        if (clicked)
+        {
+            gameController.sharedHotbar[gameController.currentSlotIndex] = b;
+        }
+
+        GUI.backgroundColor = originalBg;
+
+        // Hotkey 1-5
+        Rect btnRect = GUILayoutUtility.GetLastRect();
+        if (btnRect.Contains(Event.current.mousePosition) && Event.current.type == EventType.KeyDown)
+        {
+            KeyCode k = Event.current.keyCode;
+            if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha5)
+            {
+                gameController.sharedHotbar[k - KeyCode.Alpha1] = b;
+                Event.current.Use();
+            }
+        }
     }
 
     void DrawHotbarPreview()
@@ -146,21 +234,16 @@ public class CreativeInventory : MonoBehaviour
         int barWidth = 300;
         int startX = (Screen.width - barWidth) / 2;
         int y = Screen.height - 60;
-
         for (int i = 0; i < 5; i++)
         {
             BlockData b = gameController.sharedHotbar[i];
             string name = (b != null) ? b.blockName : "Empty";
 
-            if (i == gameController.currentSlotIndex)
-                GUI.color = Color.yellow;
-            else
-                GUI.color = Color.white;
+            if (i == gameController.currentSlotIndex) GUI.color = Color.yellow;
+            else GUI.color = Color.white;
 
             if (GUI.Button(new Rect(startX + (i * 60), y, 50, 50), $"{i + 1}\n{name}"))
-            {
                 gameController.currentSlotIndex = i;
-            }
         }
         GUI.color = Color.white;
     }

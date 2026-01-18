@@ -80,9 +80,15 @@ public class Chunk : MonoBehaviour
 
         int index = GetIndex(x, y, z);
         byte prevID = blocks[index];
-        byte newID = BlockManager.Instance.GetBlockId(block);
 
-        // Source Removal
+        // Ensure ID is valid. If 0 (and block is not null), it means it wasn't found in Registry.
+        byte newID = BlockManager.Instance.GetBlockId(block);
+        if (block != null && newID == 0)
+        {
+            Debug.LogError($"Block '{block.blockName}' is not registered! Is it in Resources/Blocks?");
+            return;
+        }
+
         if (prevID != 0)
         {
             BlockData prevData = BlockManager.Instance.GetBlockData(prevID);
@@ -92,7 +98,6 @@ public class Chunk : MonoBehaviour
 
         blocks[index] = newID;
 
-        // Reset Fluid/Body
         if (block == null) fluidLevels[index] = 0;
         else if (block.isLiquid) fluidLevels[index] = 255;
         else fluidLevels[index] = 255;
@@ -130,7 +135,6 @@ public class Chunk : MonoBehaviour
     }
     public void WakeNeighbors(int x, int y, int z) { LiquidSimulator.Instance?.WakeUpArea(this, x, y, z); }
 
-
     // --- MESH GENERATION ---
     public void RegenerateMesh()
     {
@@ -152,11 +156,11 @@ public class Chunk : MonoBehaviour
 
                     Vector3 pos = new Vector3(x, y, z);
 
-                    // --- NEW: MICRO-MODEL CHECK ---
+                    // --- MICRO-MODEL CHECK ---
                     if (block.voxelModel != null && !block.isLiquid)
                     {
-                        AddMicroMesh(terrainMesh, pos, block.voxelModel);
-                        continue; // Skip standard meshing for this block
+                        AddMicroMesh(terrainMesh, pos, block.voxelModel, block);
+                        continue;
                     }
                     // -----------------------------
 
@@ -189,50 +193,53 @@ public class Chunk : MonoBehaviour
         UpdateMeshes();
     }
 
-    // --- NEW: MICRO-MESH LOGIC ---
-    void AddMicroMesh(MeshData target, Vector3 blockPos, VoxelModelSO model)
+    // --- UPDATED MICRO-MESH LOGIC (Supports 8x, 16x, 32x) ---
+    void AddMicroMesh(MeshData target, Vector3 blockPos, VoxelModelSO model, BlockData block)
     {
-        float scale = 1f / 8f; // 0.125
+        // Force load to ensure resolution is accurate
+        model.GetVoxel(0, 0, 0);
 
-        for (int mx = 0; mx < 8; mx++)
+        int res = model.resolution;
+        if (res <= 0) res = 8;
+
+        float scale = 1.0f / (float)res;
+
+        for (int mx = 0; mx < res; mx++)
         {
-            for (int my = 0; my < 8; my++)
+            for (int my = 0; my < res; my++)
             {
-                for (int mz = 0; mz < 8; mz++)
+                for (int mz = 0; mz < res; mz++)
                 {
                     Color32 c = model.GetVoxel(mx, my, mz);
-                    if (c.a == 0) continue; // Skip air
+                    if (c.a == 0) continue;
 
                     Vector3 microPos = blockPos + new Vector3(mx * scale, my * scale, mz * scale);
 
-                    // Hidden Face Culling within the micro-model
-                    if (ShouldDrawMicroFace(model, mx, my + 1, mz)) AddMicroFace(target, microPos, Vector3.up, scale, c);
-                    if (ShouldDrawMicroFace(model, mx, my - 1, mz)) AddMicroFace(target, microPos, Vector3.down, scale, c);
-                    if (ShouldDrawMicroFace(model, mx - 1, my, mz)) AddMicroFace(target, microPos, Vector3.left, scale, c);
-                    if (ShouldDrawMicroFace(model, mx + 1, my, mz)) AddMicroFace(target, microPos, Vector3.right, scale, c);
-                    if (ShouldDrawMicroFace(model, mx, my, mz + 1)) AddMicroFace(target, microPos, Vector3.forward, scale, c);
-                    if (ShouldDrawMicroFace(model, mx, my, mz - 1)) AddMicroFace(target, microPos, Vector3.back, scale, c);
+                    // We call AddMicroFace with 6 arguments here. 
+                    // The definition below MUST match this.
+                    if (ShouldDrawMicroFace(model, mx, my + 1, mz, res)) AddMicroFace(target, microPos, Vector3.up, scale, c, block);
+                    if (ShouldDrawMicroFace(model, mx, my - 1, mz, res)) AddMicroFace(target, microPos, Vector3.down, scale, c, block);
+                    if (ShouldDrawMicroFace(model, mx - 1, my, mz, res)) AddMicroFace(target, microPos, Vector3.left, scale, c, block);
+                    if (ShouldDrawMicroFace(model, mx + 1, my, mz, res)) AddMicroFace(target, microPos, Vector3.right, scale, c, block);
+                    if (ShouldDrawMicroFace(model, mx, my, mz + 1, res)) AddMicroFace(target, microPos, Vector3.forward, scale, c, block);
+                    if (ShouldDrawMicroFace(model, mx, my, mz - 1, res)) AddMicroFace(target, microPos, Vector3.back, scale, c, block);
                 }
             }
         }
     }
 
-    bool ShouldDrawMicroFace(VoxelModelSO model, int x, int y, int z)
+    bool ShouldDrawMicroFace(VoxelModelSO model, int x, int y, int z, int res)
     {
-        // If edge of 8x8x8, we draw it (we don't check neighbors of the main block for simplicity yet)
-        if (x < 0 || x >= 8 || y < 0 || y >= 8 || z < 0 || z >= 8) return true;
-
-        // If neighbor inside model is air, we draw face
+        if (x < 0 || x >= res || y < 0 || y >= res || z < 0 || z >= res) return true;
         if (model.GetVoxel(x, y, z).a == 0) return true;
-
         return false;
     }
 
-    void AddMicroFace(MeshData target, Vector3 pos, Vector3 dir, float scale, Color32 color)
+    // --- FIX: Added 'BlockData block' parameter to match the call above ---
+    void AddMicroFace(MeshData target, Vector3 pos, Vector3 dir, float scale, Color32 color, BlockData block)
     {
         Vector3 tl = Vector3.zero, tr = Vector3.zero, bl = Vector3.zero, br = Vector3.zero;
 
-        // Identical vertex math to AddFace, but scaled
         if (dir == Vector3.up)
         {
             tl = pos + new Vector3(0, scale, 1 * scale); tr = pos + new Vector3(1 * scale, scale, 1 * scale);
@@ -265,8 +272,7 @@ public class Chunk : MonoBehaviour
         }
 
         int vCount = target.vertices.Count;
-        target.vertices.Add(tl); target.vertices.Add(tr);
-        target.vertices.Add(bl); target.vertices.Add(br);
+        target.vertices.Add(tl); target.vertices.Add(tr); target.vertices.Add(bl); target.vertices.Add(br);
 
         if (dir == Vector3.up)
         {
@@ -284,12 +290,11 @@ public class Chunk : MonoBehaviour
             target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3);
         }
 
-        // Apply Micro-Voxel Color
         target.colors.Add(color); target.colors.Add(color); target.colors.Add(color); target.colors.Add(color);
 
-        // Simple UVs (0-1 corner mapping per micro face)
-        target.uvs.Add(new Vector2(0, 1)); target.uvs.Add(new Vector2(1, 1));
-        target.uvs.Add(new Vector2(0, 0)); target.uvs.Add(new Vector2(1, 0));
+        // UV Fix: Use block sideUV for flat coloring (white pixel in atlas)
+        Vector2 uv00 = block.sideUV;
+        target.uvs.Add(uv00); target.uvs.Add(uv00); target.uvs.Add(uv00); target.uvs.Add(uv00);
     }
 
     // --- STANDARD MESHING HELPERS ---
@@ -318,7 +323,6 @@ public class Chunk : MonoBehaviour
         {
             if (neighbor.isLiquid) return true;
             if (neighbor.isTransparent) return true;
-            // NEW: If neighbor is a micro-block (voxelModel != null), we should draw our face against it!
             if (neighbor.voxelModel != null) return true;
             if (neighbor.height < 1.0f) return true;
             return false;
@@ -358,7 +362,12 @@ public class Chunk : MonoBehaviour
         tMesh.SetUVs(0, terrainMesh.uvs);
         tMesh.SetColors(terrainMesh.colors);
         tMesh.RecalculateNormals();
-        if (tMesh.vertexCount > 0) terrainCollider.sharedMesh = tMesh;
+
+        if (tMesh.vertexCount > 0)
+        {
+            terrainCollider.sharedMesh = null;
+            terrainCollider.sharedMesh = tMesh;
+        }
         else terrainCollider.sharedMesh = null;
 
         Mesh lMesh = liquidFilter.sharedMesh;
