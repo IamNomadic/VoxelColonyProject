@@ -3,50 +3,33 @@ using System.Collections.Generic;
 
 public class LiquidSimulator : MonoBehaviour
 {
-    public static LiquidSimulator Instance; 
+    public static LiquidSimulator Instance;
 
     [Header("Settings")]
-    public float flowSpeed = 15f; 
-    public byte minLiquidLevel = 5; 
+    public float flowSpeed = 15f;
+    public byte minLiquidLevel = 5;
     public byte dropletThreshold = 20;
 
     [Header("Testing")]
-    public BlockData waterReference; 
+    [Tooltip("The block to use for flowing water (Must NOT be a Source!)")]
+    public BlockData waterReference;
 
     [Header("Smart Flow")]
-    [Range(0, 8)] public int scanRadius = 5; 
+    [Range(0, 8)] public int scanRadius = 5;
 
     [Header("Fatigue")]
-    public int maxMovesBeforeDeath = 25; 
+    public int maxMovesBeforeDeath = 25;
 
-    public int maxUpdatesPerFrame = 2000; 
-    public bool isRunningUpdate = false; 
+    public int maxUpdatesPerFrame = 2000;
+    public bool isRunningUpdate = false;
 
     // --- CLASSES ---
     class LiquidNode { public Chunk c; public int x, y, z; public int moves; }
     class SourceNode { public Chunk c; public int x, y, z; }
 
-    // --- NEW: WATER BODY SYSTEM ---
-    // Fix: Defined a custom struct instead of using Vector4Int
-    public struct PoolMember 
-    { 
-        public int x, y, z, chunkID; 
-        public PoolMember(int x, int y, int z, int id) { this.x=x; this.y=y; this.z=z; this.chunkID=id; }
-    }
-
-    public class WaterBody
-    {
-        public int id;
-        public List<PoolMember> members = new List<PoolMember>(); 
-        public int debtAccumulator = 0; 
-    }
-    
-    private List<WaterBody> bodies = new List<WaterBody>();
-    private int nextBodyID = 1;
-
     // --- LISTS ---
     private List<LiquidNode> activeNodes = new List<LiquidNode>();
-    private HashSet<string> activeUnique = new HashSet<string>(); 
+    private HashSet<string> activeUnique = new HashSet<string>();
     private List<LiquidNode> inboxNodes = new List<LiquidNode>();
     private HashSet<string> inboxUnique = new HashSet<string>();
     private HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
@@ -55,7 +38,7 @@ public class LiquidSimulator : MonoBehaviour
     private float timer;
     private VoxelWorld world;
 
-    private Vector3Int[] neighborOffsets = new Vector3Int[] 
+    private Vector3Int[] neighborOffsets = new Vector3Int[]
     {
         new Vector3Int(1, 0, 0), new Vector3Int(-1, 0, 0),
         new Vector3Int(0, 0, 1), new Vector3Int(0, 0, -1)
@@ -96,7 +79,8 @@ public class LiquidSimulator : MonoBehaviour
 
                 if (below == null || (below.isLiquid && levelBelow < 255))
                 {
-                    if (below == null) s.c.SetBlock(s.x, targetY, s.z, waterReference);
+                    // Force level to 255 (Source behavior)
+                    if (below == null) s.c.SetBlock(s.x, targetY, s.z, waterReference, true);
                     s.c.SetFluidLevel(s.x, targetY, s.z, 255);
                     WakeUpArea(s.c, s.x, targetY, s.z);
                     if (!dirtyChunks.Contains(s.c)) dirtyChunks.Add(s.c);
@@ -105,16 +89,10 @@ public class LiquidSimulator : MonoBehaviour
         }
     }
 
-    // --- STANDARD API ---
     public void WakeUpArea(Chunk chunk, int x, int y, int z)
     {
-        // If the block is part of a Body, we STRIP it from the body and make it active.
         short bodyID = chunk.GetBodyID(x, y, z);
-        if (bodyID != -1)
-        {
-            chunk.SetBodyID(x, y, z, -1);
-        }
-
+        if (bodyID != -1) chunk.SetBodyID(x, y, z, -1);
         AddToInbox(chunk, x, y, z, 0);
         WakeNeighborsInternalInInbox(chunk, x, y, z);
     }
@@ -172,12 +150,12 @@ public class LiquidSimulator : MonoBehaviour
 
         foreach (var node in activeNodes)
         {
-            if (updates > maxUpdatesPerFrame) 
+            if (updates > maxUpdatesPerFrame)
             {
                 AddNodeDirect(node.c, node.x, node.y, node.z, node.moves, nextPass, nextUnique);
-                continue; 
+                continue;
             }
-            if (node.c == null) continue; 
+            if (node.c == null) continue;
 
             bool changed = Flow(node.c, node.x, node.y, node.z, node.moves, nextPass, nextUnique);
             if (changed)
@@ -185,30 +163,11 @@ public class LiquidSimulator : MonoBehaviour
                 updates++;
                 if (!dirtyChunks.Contains(node.c)) dirtyChunks.Add(node.c);
             }
-            else
-            {
-                TryFormBody(node.c, node.x, node.y, node.z);
-            }
         }
 
-        foreach (var c in dirtyChunks) if(c != null) c.RegenerateMesh();
+        foreach (var c in dirtyChunks) if (c != null) c.RegenerateMesh();
         activeNodes = nextPass;
         activeUnique = nextUnique;
-    }
-
-    // --- BODY FORMATION ---
-    void TryFormBody(Chunk c, int x, int y, int z)
-    {
-        byte level = c.GetFluidLevel(x, y, z);
-        if (level < dropletThreshold) return; 
-
-        if (c.GetBodyID(x, y, z) != -1) return;
-
-        // Assign Pool ID (Passive State)
-        c.SetBodyID(x, y, z, (short)nextBodyID);
-        
-        nextBodyID++;
-        if (nextBodyID > 30000) nextBodyID = 1;
     }
 
     bool Flow(Chunk chunk, int x, int y, int z, int currentMoves, List<LiquidNode> nextList, HashSet<string> nextSet)
@@ -218,24 +177,18 @@ public class LiquidSimulator : MonoBehaviour
         if (block == null || !block.isLiquid || myLevel <= 0) return false;
 
         bool changed = false;
-        bool stillActive = false; 
-        bool flowedThisFrame = false; 
+        bool stillActive = false;
 
+        // 0. EVAPORATION (Fatigue)
         if (myLevel < dropletThreshold && currentMoves > maxMovesBeforeDeath)
         {
-            chunk.SetBlock(x, y, z, null);
+            chunk.SetBlock(x, y, z, null, true); // True = IsSimulation
             chunk.SetFluidLevel(x, y, z, 0);
             WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
-            return true; 
+            return true;
         }
 
-        if (myLevel == 255 && y < Chunk.CHUNK_HEIGHT - 1)
-        {
-            BlockData above = chunk.GetBlock(x, y + 1, z);
-            if (above != null && above.isLiquid) return false; 
-        }
-
-        // 1. GRAVITY
+        // 1. GRAVITY (Vertical)
         if (y > 0)
         {
             if (GetNeighborBlock(chunk, x, y - 1, z, out Chunk belowC, out int bx, out int by, out int bz))
@@ -250,22 +203,26 @@ public class LiquidSimulator : MonoBehaviour
                     byte moveAmount = (byte)Mathf.Min(myLevel, spaceBelow);
                     if (moveAmount > 0)
                     {
-                        if (below == null) belowC.SetBlock(bx, by, bz, block);
+                        if (below == null) belowC.SetBlock(bx, by, bz, waterReference ?? block, true);
+
                         belowC.SetFluidLevel(bx, by, bz, (byte)(levelBelow + moveAmount));
                         myLevel -= moveAmount;
                         chunk.SetFluidLevel(x, y, z, myLevel);
-                        
+
                         AddNodeDirect(belowC, bx, by, bz, 0, nextList, nextSet);
                         if (!dirtyChunks.Contains(belowC)) dirtyChunks.Add(belowC);
-                        
+
                         WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
-                        changed = true; stillActive = true; flowedThisFrame = true;
+                        changed = true; stillActive = true;
+
+                        // If we dropped all our water, stop.
+                        if (myLevel == 0) return true;
                     }
                 }
             }
         }
 
-        // 2. SIDEWAYS
+        // 2. SIDEWAYS (Horizontal)
         if (myLevel > minLiquidLevel)
         {
             int prioritizedIndex = -1;
@@ -274,16 +231,15 @@ public class LiquidSimulator : MonoBehaviour
             ShuffleOffsets();
             List<Vector3Int> checkOrder = new List<Vector3Int>();
             Vector3Int smartVector = Vector3Int.zero;
-            if (prioritizedIndex != -1) {
-                if(prioritizedIndex == 0) smartVector = new Vector3Int(1,0,0);
-                if(prioritizedIndex == 1) smartVector = new Vector3Int(-1,0,0);
-                if(prioritizedIndex == 2) smartVector = new Vector3Int(0,0,1);
-                if(prioritizedIndex == 3) smartVector = new Vector3Int(0,0,-1);
+            if (prioritizedIndex != -1)
+            {
+                if (prioritizedIndex == 0) smartVector = new Vector3Int(1, 0, 0);
+                if (prioritizedIndex == 1) smartVector = new Vector3Int(-1, 0, 0);
+                if (prioritizedIndex == 2) smartVector = new Vector3Int(0, 0, 1);
+                if (prioritizedIndex == 3) smartVector = new Vector3Int(0, 0, -1);
                 checkOrder.Add(smartVector);
             }
-            foreach(var off in neighborOffsets) if (off != smartVector) checkOrder.Add(off);
-
-            bool isDroplet = myLevel < dropletThreshold;
+            foreach (var off in neighborOffsets) if (off != smartVector) checkOrder.Add(off);
 
             foreach (Vector3Int offset in checkOrder)
             {
@@ -292,26 +248,35 @@ public class LiquidSimulator : MonoBehaviour
                 if (GetNeighborBlock(chunk, x + offset.x, y, z + offset.z, out Chunk nChunk, out int nX, out int nY, out int nZ))
                 {
                     BlockData nBlock = nChunk.GetBlock(nX, nY, nZ);
-                    
+
                     if (nBlock == null || nBlock.isLiquid)
                     {
                         byte nLevel = (nBlock == null) ? (byte)0 : nChunk.GetFluidLevel(nX, nY, nZ);
 
+                        // Only flow if we have more than neighbor
                         if (myLevel > nLevel)
                         {
-                            byte amountToGive = 0;
-                            if (isDroplet) amountToGive = myLevel; 
-                            else
-                            {
-                                int total = myLevel + nLevel;
-                                int average = total / 2;
-                                int remainder = total % 2; 
-                                amountToGive = (byte)(myLevel - (average + remainder));
-                            }
+                            // Calculate Difference
+                            int difference = myLevel - nLevel;
+
+                            // DAMPING: Only move 50% of the difference per tick.
+                            // This prevents "Jumping" and "Sloshing" at corners.
+                            // (If difference is 1, integer division makes this 0, so we check for that)
+                            int flowAmt = difference / 2;
+                            if (flowAmt == 0 && difference > 0) flowAmt = 1;
+
+                            // Clamp flow to what we actually have
+                            if (flowAmt > myLevel) flowAmt = myLevel;
+
+                            // Clamp flow to space available
+                            if (nLevel + flowAmt > 255) flowAmt = 255 - nLevel;
+
+                            byte amountToGive = (byte)flowAmt;
 
                             if (amountToGive > 0)
                             {
-                                if (nBlock == null) nChunk.SetBlock(nX, nY, nZ, block);
+                                // IMPORTANT: 'true' prevents Source Creation
+                                if (nBlock == null) nChunk.SetBlock(nX, nY, nZ, waterReference ?? block, true);
 
                                 nChunk.SetFluidLevel(nX, nY, nZ, (byte)(nLevel + amountToGive));
                                 myLevel -= amountToGive;
@@ -319,38 +284,10 @@ public class LiquidSimulator : MonoBehaviour
 
                                 AddNodeDirect(nChunk, nX, nY, nZ, currentMoves + 1, nextList, nextSet);
                                 if (!dirtyChunks.Contains(nChunk)) dirtyChunks.Add(nChunk);
-                                
+
                                 WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
-                                changed = true; stillActive = true; flowedThisFrame = true;
-                                if (myLevel == 0) break; 
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // --- SIPPING LOGIC ---
-        if (myLevel < 250) 
-        {
-            foreach (var off in neighborOffsets)
-            {
-                if (GetNeighborBlock(chunk, x + off.x, y, z + off.z, out Chunk nChunk, out int nX, out int nY, out int nZ))
-                {
-                    short nBodyID = nChunk.GetBodyID(nX, nY, nZ);
-                    if (nBodyID != -1) 
-                    {
-                        byte nLevel = nChunk.GetFluidLevel(nX, nY, nZ);
-                        if (nLevel > myLevel)
-                        {
-                            byte sip = (byte)((nLevel - myLevel) / 2);
-                            if (sip > 0)
-                            {
-                                nChunk.SetFluidLevel(nX, nY, nZ, (byte)(nLevel - sip));
-                                myLevel += sip;
-                                chunk.SetFluidLevel(x, y, z, myLevel);
-                                if (!dirtyChunks.Contains(nChunk)) dirtyChunks.Add(nChunk);
-                                changed = true;
+                                changed = true; stillActive = true;
+                                if (myLevel == 0) break;
                             }
                         }
                     }
@@ -358,18 +295,13 @@ public class LiquidSimulator : MonoBehaviour
             }
         }
 
-        if (!flowedThisFrame && myLevel < dropletThreshold)
-        {
-            currentMoves += 5;
-            stillActive = true; 
-        }
-
+        // Cleanup empty blocks
         if (chunk.GetFluidLevel(x, y, z) <= minLiquidLevel)
         {
-            chunk.SetBlock(x, y, z, null);
+            chunk.SetBlock(x, y, z, null, true); // True
             chunk.SetFluidLevel(x, y, z, 0);
             WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
-            changed = true; stillActive = false; 
+            changed = true; stillActive = false;
         }
 
         if (stillActive || changed) AddNodeDirect(chunk, x, y, z, currentMoves, nextList, nextSet);
@@ -380,7 +312,7 @@ public class LiquidSimulator : MonoBehaviour
     {
         AddNodeDirect(c, x + 1, y, z, 0, list, set);
         AddNodeDirect(c, x - 1, y, z, 0, list, set);
-        AddNodeDirect(c, x, y + 1, z, 0, list, set); 
+        AddNodeDirect(c, x, y + 1, z, 0, list, set);
         AddNodeDirect(c, x, y - 1, z, 0, list, set);
         AddNodeDirect(c, x, y, z + 1, 0, list, set);
         AddNodeDirect(c, x, y, z - 1, 0, list, set);
@@ -390,15 +322,20 @@ public class LiquidSimulator : MonoBehaviour
     {
         int bestDir = -1;
         float shortestDistSq = 9999f;
-        for (int x = -scanRadius; x <= scanRadius; x++) {
-            for (int z = -scanRadius; z <= scanRadius; z++) {
+        for (int x = -scanRadius; x <= scanRadius; x++)
+        {
+            for (int z = -scanRadius; z <= scanRadius; z++)
+            {
                 if (x == 0 && z == 0) continue;
-                if ((x*x + z*z) > (scanRadius*scanRadius)) continue;
-                if (GetNeighborBlock(originChunk, startX + x, startY - 1, startZ + z, out Chunk nC, out int nX, out int nY, out int nZ)) {
+                if ((x * x + z * z) > (scanRadius * scanRadius)) continue;
+                if (GetNeighborBlock(originChunk, startX + x, startY - 1, startZ + z, out Chunk nC, out int nX, out int nY, out int nZ))
+                {
                     BlockData b = nC.GetBlock(nX, nY, nZ);
-                    if (b == null || (b.isLiquid && nC.GetFluidLevel(nX, nY, nZ) < 200)) {
-                        float distSq = x*x + z*z;
-                        if (distSq < shortestDistSq) {
+                    if (b == null || (b.isLiquid && nC.GetFluidLevel(nX, nY, nZ) < 200))
+                    {
+                        float distSq = x * x + z * z;
+                        if (distSq < shortestDistSq)
+                        {
                             shortestDistSq = distSq;
                             if (Mathf.Abs(x) > Mathf.Abs(z)) bestDir = (x > 0) ? 0 : 1;
                             else bestDir = (z > 0) ? 2 : 3;
@@ -412,7 +349,8 @@ public class LiquidSimulator : MonoBehaviour
 
     void ShuffleOffsets()
     {
-        for (int i = 0; i < neighborOffsets.Length; i++) {
+        for (int i = 0; i < neighborOffsets.Length; i++)
+        {
             int rnd = Random.Range(i, neighborOffsets.Length);
             Vector3Int temp = neighborOffsets[rnd];
             neighborOffsets[rnd] = neighborOffsets[i];
@@ -425,7 +363,7 @@ public class LiquidSimulator : MonoBehaviour
         if (GetNeighborBlock(c, x, y, z, out Chunk targetC, out int tx, out int ty, out int tz))
         {
             short bID = targetC.GetBodyID(tx, ty, tz);
-            if (bID != -1) targetC.SetBodyID(tx, ty, tz, -1); 
+            if (bID != -1) targetC.SetBodyID(tx, ty, tz, -1);
 
             string key = $"{targetC.GetInstanceID()}_{tx}_{ty}_{tz}";
             if (!set.Contains(key))
@@ -450,7 +388,8 @@ public class LiquidSimulator : MonoBehaviour
         if (z < 0) { nextCZ--; targetZ = Chunk.CHUNK_SIZE - 1; }
         else if (z >= Chunk.CHUNK_SIZE) { nextCZ++; targetZ = 0; }
 
-        if (world != null) {
+        if (world != null)
+        {
             targetChunk = world.GetChunkByCoord(nextCX, nextCZ);
             return targetChunk != null;
         }

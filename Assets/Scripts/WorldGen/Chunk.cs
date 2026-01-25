@@ -74,20 +74,15 @@ public class Chunk : MonoBehaviour
         return BlockManager.Instance.GetBlockData(GetBlockID(x, y, z));
     }
 
-    public void SetBlock(int x, int y, int z, BlockData block)
+    public void SetBlock(int x, int y, int z, BlockData block, bool isSimulation = false)
     {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) return;
 
         int index = GetIndex(x, y, z);
         byte prevID = blocks[index];
 
-        // Ensure ID is valid. If 0 (and block is not null), it means it wasn't found in Registry.
         byte newID = BlockManager.Instance.GetBlockId(block);
-        if (block != null && newID == 0)
-        {
-            Debug.LogError($"Block '{block.blockName}' is not registered! Is it in Resources/Blocks?");
-            return;
-        }
+        if (block != null && newID == 0) return; // Safety
 
         if (prevID != 0)
         {
@@ -97,14 +92,25 @@ public class Chunk : MonoBehaviour
         }
 
         blocks[index] = newID;
-
-        if (block == null) fluidLevels[index] = 0;
-        else if (block.isLiquid) fluidLevels[index] = 255;
-        else fluidLevels[index] = 255;
-
         waterBodyIDs[index] = -1;
 
-        if (block != null && block.isWaterSource)
+        // --- MASS CONSERVATION CHECK ---
+        if (!isSimulation)
+        {
+            // Player Placement: Default to FULL (255)
+            if (block == null) fluidLevels[index] = 0;
+            else if (block.isLiquid) fluidLevels[index] = 255;
+            else fluidLevels[index] = 255;
+        }
+        else
+        {
+            // Simulation Flow: Default to EMPTY (0)
+            // The simulator will add the specific liquid amount immediately after this call.
+            if (block == null || block.isLiquid) fluidLevels[index] = 0;
+        }
+
+        // Only register source if PLAYER placed it
+        if (!isSimulation && block != null && block.isWaterSource)
             LiquidSimulator.Instance?.AddSource(this, x, y, z);
 
         if (prevID != newID && (LiquidSimulator.Instance == null || !LiquidSimulator.Instance.isRunningUpdate))
@@ -162,7 +168,6 @@ public class Chunk : MonoBehaviour
                         AddMicroMesh(terrainMesh, pos, block.voxelModel, block);
                         continue;
                     }
-                    // -----------------------------
 
                     MeshData targetMesh = block.isLiquid ? liquidMesh : terrainMesh;
                     float h = block.height;
@@ -193,10 +198,8 @@ public class Chunk : MonoBehaviour
         UpdateMeshes();
     }
 
-    // --- UPDATED MICRO-MESH LOGIC (Supports 8x, 16x, 32x) ---
     void AddMicroMesh(MeshData target, Vector3 blockPos, VoxelModelSO model, BlockData block)
     {
-        // Force load to ensure resolution is accurate
         model.GetVoxel(0, 0, 0);
 
         int res = model.resolution;
@@ -215,8 +218,6 @@ public class Chunk : MonoBehaviour
 
                     Vector3 microPos = blockPos + new Vector3(mx * scale, my * scale, mz * scale);
 
-                    // We call AddMicroFace with 6 arguments here. 
-                    // The definition below MUST match this.
                     if (ShouldDrawMicroFace(model, mx, my + 1, mz, res)) AddMicroFace(target, microPos, Vector3.up, scale, c, block);
                     if (ShouldDrawMicroFace(model, mx, my - 1, mz, res)) AddMicroFace(target, microPos, Vector3.down, scale, c, block);
                     if (ShouldDrawMicroFace(model, mx - 1, my, mz, res)) AddMicroFace(target, microPos, Vector3.left, scale, c, block);
@@ -235,7 +236,6 @@ public class Chunk : MonoBehaviour
         return false;
     }
 
-    // --- FIX: Added 'BlockData block' parameter to match the call above ---
     void AddMicroFace(MeshData target, Vector3 pos, Vector3 dir, float scale, Color32 color, BlockData block)
     {
         Vector3 tl = Vector3.zero, tr = Vector3.zero, bl = Vector3.zero, br = Vector3.zero;
@@ -274,15 +274,10 @@ public class Chunk : MonoBehaviour
         int vCount = target.vertices.Count;
         target.vertices.Add(tl); target.vertices.Add(tr); target.vertices.Add(bl); target.vertices.Add(br);
 
-        if (dir == Vector3.up)
+        if (dir == Vector3.up || dir == Vector3.down)
         {
             target.triangles.Add(vCount); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2);
             target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 3);
-        }
-        else if (dir == Vector3.down)
-        {
-            target.triangles.Add(vCount); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1);
-            target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3); target.triangles.Add(vCount + 1);
         }
         else
         {
@@ -291,8 +286,6 @@ public class Chunk : MonoBehaviour
         }
 
         target.colors.Add(color); target.colors.Add(color); target.colors.Add(color); target.colors.Add(color);
-
-        // UV Fix: Use block sideUV for flat coloring (white pixel in atlas)
         Vector2 uv00 = block.sideUV;
         target.uvs.Add(uv00); target.uvs.Add(uv00); target.uvs.Add(uv00); target.uvs.Add(uv00);
     }
@@ -342,9 +335,16 @@ public class Chunk : MonoBehaviour
         int vCount = target.vertices.Count;
         target.vertices.Add(tl); target.vertices.Add(tr); target.vertices.Add(bl); target.vertices.Add(br);
 
-        if (dir == Vector3.up) { target.triangles.Add(vCount); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 3); }
-        else if (dir == Vector3.down) { target.triangles.Add(vCount); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3); target.triangles.Add(vCount + 1); }
-        else { target.triangles.Add(vCount); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3); }
+        if (dir == Vector3.up || dir == Vector3.down)
+        {
+            target.triangles.Add(vCount); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2);
+            target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 3);
+        }
+        else
+        {
+            target.triangles.Add(vCount); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 1);
+            target.triangles.Add(vCount + 1); target.triangles.Add(vCount + 2); target.triangles.Add(vCount + 3);
+        }
 
         Color c = block.blockColor;
         if (c.a == 0) c.a = 1f;

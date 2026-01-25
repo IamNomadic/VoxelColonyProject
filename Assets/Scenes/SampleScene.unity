@@ -500,7 +500,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   flowSpeed: 5
-  minLiquidLevel: 5
+  minLiquidLevel: 20
   dropletThreshold: 30
   waterReference: {fileID: 11400000, guid: 387cdfa061f1fc34baa76e0bcc565642, type: 2}
   scanRadius: 8
