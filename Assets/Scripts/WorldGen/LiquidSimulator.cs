@@ -49,6 +49,9 @@ public class LiquidSimulator : MonoBehaviour
 
     void Update()
     {
+        // SAFETY: Do not simulate liquids while the world is still loading
+        if (world != null && world.IsGenerating) return;
+
         timer += Time.deltaTime;
         if (timer > (1f / flowSpeed))
         {
@@ -79,7 +82,6 @@ public class LiquidSimulator : MonoBehaviour
 
                 if (below == null || (below.isLiquid && levelBelow < 255))
                 {
-                    // Force level to 255 (Source behavior)
                     if (below == null) s.c.SetBlock(s.x, targetY, s.z, waterReference, true);
                     s.c.SetFluidLevel(s.x, targetY, s.z, 255);
                     WakeUpArea(s.c, s.x, targetY, s.z);
@@ -91,6 +93,9 @@ public class LiquidSimulator : MonoBehaviour
 
     public void WakeUpArea(Chunk chunk, int x, int y, int z)
     {
+        // Safety: If generating, do not process wake ups
+        if (world != null && world.IsGenerating) return;
+
         short bodyID = chunk.GetBodyID(x, y, z);
         if (bodyID != -1) chunk.SetBodyID(x, y, z, -1);
         AddToInbox(chunk, x, y, z, 0);
@@ -179,16 +184,16 @@ public class LiquidSimulator : MonoBehaviour
         bool changed = false;
         bool stillActive = false;
 
-        // 0. EVAPORATION (Fatigue)
+        // 0. EVAPORATION
         if (myLevel < dropletThreshold && currentMoves > maxMovesBeforeDeath)
         {
-            chunk.SetBlock(x, y, z, null, true); // True = IsSimulation
+            chunk.SetBlock(x, y, z, null, true);
             chunk.SetFluidLevel(x, y, z, 0);
             WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
             return true;
         }
 
-        // 1. GRAVITY (Vertical)
+        // 1. GRAVITY
         if (y > 0)
         {
             if (GetNeighborBlock(chunk, x, y - 1, z, out Chunk belowC, out int bx, out int by, out int bz))
@@ -215,14 +220,13 @@ public class LiquidSimulator : MonoBehaviour
                         WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
                         changed = true; stillActive = true;
 
-                        // If we dropped all our water, stop.
                         if (myLevel == 0) return true;
                     }
                 }
             }
         }
 
-        // 2. SIDEWAYS (Horizontal)
+        // 2. SIDEWAYS
         if (myLevel > minLiquidLevel)
         {
             int prioritizedIndex = -1;
@@ -252,30 +256,17 @@ public class LiquidSimulator : MonoBehaviour
                     if (nBlock == null || nBlock.isLiquid)
                     {
                         byte nLevel = (nBlock == null) ? (byte)0 : nChunk.GetFluidLevel(nX, nY, nZ);
-
-                        // Only flow if we have more than neighbor
                         if (myLevel > nLevel)
                         {
-                            // Calculate Difference
                             int difference = myLevel - nLevel;
-
-                            // DAMPING: Only move 50% of the difference per tick.
-                            // This prevents "Jumping" and "Sloshing" at corners.
-                            // (If difference is 1, integer division makes this 0, so we check for that)
                             int flowAmt = difference / 2;
                             if (flowAmt == 0 && difference > 0) flowAmt = 1;
-
-                            // Clamp flow to what we actually have
                             if (flowAmt > myLevel) flowAmt = myLevel;
-
-                            // Clamp flow to space available
                             if (nLevel + flowAmt > 255) flowAmt = 255 - nLevel;
 
                             byte amountToGive = (byte)flowAmt;
-
                             if (amountToGive > 0)
                             {
-                                // IMPORTANT: 'true' prevents Source Creation
                                 if (nBlock == null) nChunk.SetBlock(nX, nY, nZ, waterReference ?? block, true);
 
                                 nChunk.SetFluidLevel(nX, nY, nZ, (byte)(nLevel + amountToGive));
@@ -298,7 +289,7 @@ public class LiquidSimulator : MonoBehaviour
         // Cleanup empty blocks
         if (chunk.GetFluidLevel(x, y, z) <= minLiquidLevel)
         {
-            chunk.SetBlock(x, y, z, null, true); // True
+            chunk.SetBlock(x, y, z, null, true);
             chunk.SetFluidLevel(x, y, z, 0);
             WakeNeighborsInternal(chunk, x, y, z, nextList, nextSet);
             changed = true; stillActive = false;

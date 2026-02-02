@@ -1,326 +1,489 @@
-using System.Collections.Generic;
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 public class VoxelWorld : MonoBehaviour
 {
-    // --- INSPECTOR SETTINGS ---
-    [Header("1. World Configuration")]
-    [Min(1)] public int worldSizeChunksX = 20;
-    [Min(1)] public int worldSizeChunksZ = 20;
+    [Header("1. Infinite Generation")]
     public Material defaultMaterial;
     public BlockData bedrockBlock;
 
-    [Header("2. Biome Strategy")]
-    public VoxelBiomeSO[] biomes;
-    public float temperatureScale = 0.05f;
+    [Header("2. Player View Settings")]
+    public Transform player;
+    [Range(2, 32)] public int viewDistance = 8;
+    public int unloadBuffer = 2;
 
-    [Header("3. Edge Blending & Warping")]
+    [Header("3. Biome Strategy (Voronoi)")]
+    public VoxelBiomeSO[] biomes;
+    [Tooltip("How large the 'Grown' biome patches are (in Chunks).")]
+    public int biomeCellSize = 15;
+    [Tooltip("Scale of the underlying temperature map.")]
+    public float temperatureScale = 0.002f;
+    public float biomeOffset = 5000f;
+
+    [Header("4. Generation Noise")]
     public float warpStrength = 15f;
     public float warpScale = 0.03f;
-
-    [Header("4. Global Terrain Shape")]
     public float globalScale = 0.005f;
     public int globalAmplitude = 30;
     public int globalHeightOffset = 0;
 
+    [Header("5. Async Performance")]
+    public float maxMsPerFrame = 8f;
+
     // --- INTERNAL DATA ---
-    private int[,] chunkBiomeMap;
-    private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
-    private float tempOffset;
-    private float warpOffset;
+    private Dictionary<Vector2Int, Chunk> activeChunks = new Dictionary<Vector2Int, Chunk>();
+
+    // Queues
+    private HashSet<Vector2Int> chunksDataQueued = new HashSet<Vector2Int>();
+    private HashSet<Vector2Int> chunksMeshQueued = new HashSet<Vector2Int>();
+    private List<Vector2Int> creationList = new List<Vector2Int>();
+    private List<Chunk> meshingList = new List<Chunk>();
+
+    private float warpNoiseOffset;
+    private int seedOffset; // For deterministic biome seeds
+    private Vector2Int lastPlayerChunkCoord = new Vector2Int(-999999, -999999);
+
+    public bool IsGenerating { get; private set; }
 
     void Start()
     {
-        tempOffset = Random.Range(0f, 10000f);
-        warpOffset = Random.Range(0f, 10000f);
-        GenerateWorld();
+        if (player == null)
+        {
+            var pm = FindObjectOfType<PlayerMovement>();
+            if (pm != null) player = pm.transform;
+            else if (Camera.main != null) player = Camera.main.transform;
+        }
+
+        warpNoiseOffset = Random.Range(0f, 10000f);
+        biomeOffset += Random.Range(0f, 10000f);
+        seedOffset = Random.Range(0, 100000);
+
+        StartCoroutine(ProcessWorldQueues());
     }
 
     void Update()
     {
+        if (player == null) return;
+
+        Vector3 pPos = player.position;
+        int pCx = Mathf.FloorToInt(pPos.x / Chunk.CHUNK_SIZE);
+        int pCz = Mathf.FloorToInt(pPos.z / Chunk.CHUNK_SIZE);
+        Vector2Int currentChunkCoord = new Vector2Int(pCx, pCz);
+
+        if (currentChunkCoord != lastPlayerChunkCoord)
+        {
+            lastPlayerChunkCoord = currentChunkCoord;
+            UpdateVisibleChunks(currentChunkCoord);
+        }
+
         if (Input.GetKey(KeyCode.RightControl) && Input.GetKeyDown(KeyCode.R))
         {
-            tempOffset = Random.Range(0f, 10000f);
-            warpOffset = Random.Range(0f, 10000f);
             RegenerateWorld();
         }
     }
 
-    // --- API (Interaction) ---
-    public void ModifyBlock(Vector3 worldPos, BlockData newBlock)
+    // --- CHUNK MANAGEMENT ---
+    void UpdateVisibleChunks(Vector2Int center)
     {
-        int x = Mathf.FloorToInt(worldPos.x);
-        int y = Mathf.FloorToInt(worldPos.y);
-        int z = Mathf.FloorToInt(worldPos.z);
-
-        SetBlockDataOnly(x, y, z, newBlock);
-
-        Vector2Int coord = GetChunkCoord(x, z);
-        int cx = coord.x;
-        int cz = coord.y;
-
-        int lx = x - (cx * Chunk.CHUNK_SIZE);
-        int lz = z - (cz * Chunk.CHUNK_SIZE);
-
-        UpdateChunkMesh(cx, cz);
-
-        if (lx == 0) UpdateChunkMesh(cx - 1, cz);
-        if (lx == Chunk.CHUNK_SIZE - 1) UpdateChunkMesh(cx + 1, cz);
-        if (lz == 0) UpdateChunkMesh(cx, cz - 1);
-        if (lz == Chunk.CHUNK_SIZE - 1) UpdateChunkMesh(cx, cz + 1);
-    }
-
-    public BlockData GetBlock(Vector3 worldPos)
-    {
-        int x = Mathf.FloorToInt(worldPos.x);
-        int y = Mathf.FloorToInt(worldPos.y);
-        int z = Mathf.FloorToInt(worldPos.z);
-        return GetBlockDataOnly(x, y, z);
-    }
-
-    // --- GENERATION PIPELINE ---
-    public void RegenerateWorld()
-    {
-        ClearWorld();
-        GenerateWorld();
-    }
-
-    void ClearWorld()
-    {
-        foreach (var chunk in chunks.Values) if (chunk != null) Destroy(chunk.gameObject);
-        chunks.Clear();
-    }
-
-    void GenerateWorld()
-    {
-        GenerateBiomeMap();
-
-        for (int cx = 0; cx < worldSizeChunksX; cx++)
-            for (int cz = 0; cz < worldSizeChunksZ; cz++)
-                CreateChunk(cx, cz);
-
-        int totalWidth = worldSizeChunksX * Chunk.CHUNK_SIZE;
-        int totalDepth = worldSizeChunksZ * Chunk.CHUNK_SIZE;
-
-        for (int x = 0; x < totalWidth; x++)
+        for (int x = -viewDistance; x <= viewDistance; x++)
         {
-            for (int z = 0; z < totalDepth; z++)
+            for (int z = -viewDistance; z <= viewDistance; z++)
             {
-                float warpX = (Mathf.PerlinNoise((x + warpOffset) * warpScale, (z + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
-                float warpZ = (Mathf.PerlinNoise((z + warpOffset) * warpScale, (x + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
+                Vector2Int coord = new Vector2Int(center.x + x, center.y + z);
+                if (!activeChunks.ContainsKey(coord) && !chunksDataQueued.Contains(coord))
+                {
+                    chunksDataQueued.Add(coord);
+                    creationList.Add(coord);
+                }
+            }
+        }
 
-                float sampleX = x + warpX;
-                float sampleZ = z + warpZ;
+        List<Vector2Int> toRemove = new List<Vector2Int>();
+        int unloadDist = viewDistance + unloadBuffer;
 
-                float biomeHeight = GetBilinearSmoothedHeight(sampleX, sampleZ);
-                float globalNoise = Mathf.PerlinNoise(sampleX * globalScale, sampleZ * globalScale) * globalAmplitude;
+        foreach (var kvp in activeChunks)
+        {
+            int dist = Mathf.Max(Mathf.Abs(kvp.Key.x - center.x), Mathf.Abs(kvp.Key.y - center.y));
+            if (dist > unloadDist) toRemove.Add(kvp.Key);
+        }
 
+        foreach (var coord in toRemove)
+        {
+            if (activeChunks.TryGetValue(coord, out Chunk c))
+            {
+                activeChunks.Remove(coord);
+                if (c != null) Destroy(c.gameObject);
+                if (chunksDataQueued.Contains(coord)) chunksDataQueued.Remove(coord);
+                if (chunksMeshQueued.Contains(coord)) chunksMeshQueued.Remove(coord);
+            }
+        }
+    }
+
+    // --- ASYNC PROCESSOR ---
+    IEnumerator ProcessWorldQueues()
+    {
+        System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
+
+        while (true)
+        {
+            IsGenerating = true;
+            timer.Restart();
+
+            // PHASE 1: PRIORITIZE
+            if (player != null && creationList.Count > 0)
+            {
+                Vector2Int pCoord = GetChunkCoord(Mathf.FloorToInt(player.position.x), Mathf.FloorToInt(player.position.z));
+                creationList.Sort((a, b) => {
+                    float distA = (a - pCoord).sqrMagnitude;
+                    float distB = (b - pCoord).sqrMagnitude;
+                    return distA.CompareTo(distB);
+                });
+            }
+
+            // PHASE 2: CREATE DATA
+            while (creationList.Count > 0 && timer.ElapsedMilliseconds < maxMsPerFrame)
+            {
+                Vector2Int coord = creationList[0];
+                creationList.RemoveAt(0);
+                chunksDataQueued.Remove(coord);
+
+                if (!IsChunkInLoadRange(coord)) continue;
+
+                CreateChunkObject(coord.x, coord.y);
+                GenerateChunkTerrainData(coord.x, coord.y);
+                GenerateStructuresForChunk(coord.x, coord.y);
+
+                if (!chunksMeshQueued.Contains(coord))
+                {
+                    chunksMeshQueued.Add(coord);
+                    meshingList.Add(activeChunks[coord]);
+                }
+            }
+
+            // PHASE 3: GENERATE MESHES
+            if (timer.ElapsedMilliseconds < maxMsPerFrame && meshingList.Count > 0)
+            {
+                if (player != null)
+                {
+                    Vector3 pPos = player.position;
+                    meshingList.Sort((a, b) =>
+                    {
+                        if (a == null || b == null) return 0;
+                        float distA = (a.transform.position - pPos).sqrMagnitude;
+                        float distB = (b.transform.position - pPos).sqrMagnitude;
+                        return distA.CompareTo(distB);
+                    });
+                }
+
+                for (int i = meshingList.Count - 1; i >= 0; i--)
+                {
+                    if (timer.ElapsedMilliseconds >= maxMsPerFrame) break;
+
+                    Chunk c = meshingList[i];
+                    if (c == null) { meshingList.RemoveAt(i); continue; }
+
+                    if (!activeChunks.ContainsKey(c.chunkCoord))
+                    {
+                        meshingList.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (AreNeighborsLoaded(c.chunkCoord))
+                    {
+                        c.RegenerateMesh();
+                        chunksMeshQueued.Remove(c.chunkCoord);
+                        meshingList.RemoveAt(i);
+                    }
+                }
+            }
+
+            IsGenerating = false;
+            yield return null;
+        }
+    }
+
+    // --- INFINITE VORONOI BIOMES ---
+    // This adapts "Seed and Grow" to infinite math
+    VoxelBiomeSO GetBiomeVoronoi(int chunkX, int chunkZ)
+    {
+        // 1. Identify which "Macro Cell" this chunk belongs to
+        int cellScale = Mathf.Max(1, biomeCellSize);
+        int cellX = Mathf.FloorToInt((float)chunkX / cellScale);
+        int cellZ = Mathf.FloorToInt((float)chunkZ / cellScale);
+
+        float minDist = float.MaxValue;
+        Vector2Int bestSeed = Vector2Int.zero;
+
+        // 2. Search neighbors (3x3 grid) to find the closest Seed
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                int cx = cellX + i;
+                int cz = cellZ + j;
+
+                // Deterministic Random Seed for this cell
+                // We assume this cell has a "Seed Point" somewhere inside it
+                Random.InitState((cx * 8901) + (cz * 2345) + seedOffset);
+                int localX = Random.Range(0, cellScale);
+                int localZ = Random.Range(0, cellScale);
+
+                Vector2Int seedPos = new Vector2Int(cx * cellScale + localX, cz * cellScale + localZ);
+
+                // Is this seed closer than the last one?
+                float dist = Vector2Int.Distance(new Vector2Int(chunkX, chunkZ), seedPos);
+
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    bestSeed = seedPos;
+                }
+            }
+        }
+
+        // 3. The Winner determines the biome for this chunk
+        // We use the Seed's position for temperature, ensuring the whole patch is consistent
+        float noise = Mathf.PerlinNoise((bestSeed.x + biomeOffset) * temperatureScale, (bestSeed.y + biomeOffset) * temperatureScale);
+        return PickBiomeForTemperature(noise);
+    }
+
+    VoxelBiomeSO PickBiomeForTemperature(float temp)
+    {
+        VoxelBiomeSO bestBiome = biomes[0];
+        float minDiff = 100f;
+        List<VoxelBiomeSO> candidates = new List<VoxelBiomeSO>();
+        foreach (var b in biomes)
+        {
+            if (temp >= b.optimalTemperature - b.temperatureTolerance && temp <= b.optimalTemperature + b.temperatureTolerance)
+            {
+                candidates.Add(b);
+            }
+        }
+        if (candidates.Count > 0) return candidates[0];
+
+        foreach (var b in biomes)
+        {
+            float diff = Mathf.Abs(temp - b.optimalTemperature);
+            if (diff < minDiff) { minDiff = diff; bestBiome = b; }
+        }
+        return bestBiome;
+    }
+
+    // --- TERRAIN GENERATION ---
+
+    void GenerateChunkTerrainData(int cx, int cz)
+    {
+        if (!activeChunks.TryGetValue(new Vector2Int(cx, cz), out Chunk chunk)) return;
+
+        int startX = cx * Chunk.CHUNK_SIZE;
+        int startZ = cz * Chunk.CHUNK_SIZE;
+
+        // Pre-fetch biome for block filling (center of chunk)
+        VoxelBiomeSO chunkBiome = GetBiomeVoronoi(cx, cz);
+
+        for (int x = 0; x < Chunk.CHUNK_SIZE; x++)
+        {
+            for (int z = 0; z < Chunk.CHUNK_SIZE; z++)
+            {
+                int worldX = startX + x;
+                int worldZ = startZ + z;
+
+                // 1. WARP
+                float wX = (Mathf.PerlinNoise((worldX + warpNoiseOffset) * warpScale, (worldZ + warpNoiseOffset) * warpScale) * 2f - 1f) * warpStrength;
+                float wZ = (Mathf.PerlinNoise((worldZ + warpNoiseOffset) * warpScale, (worldX + warpNoiseOffset) * warpScale) * 2f - 1f) * warpStrength;
+                float sX = worldX + wX;
+                float sZ = worldZ + wZ;
+
+                // 2. SMOOTH BIOME HEIGHT (Bilinear blend of Voronoi neighbors)
+                float biomeHeight = GetSmoothInfiniteBiomeHeight(sX, sZ);
+
+                // 3. GLOBAL NOISE
+                float globalNoise = Mathf.PerlinNoise(sX * globalScale, sZ * globalScale) * globalAmplitude;
                 float finalHeightFloat = biomeHeight + globalNoise + globalHeightOffset;
 
-                int biomeCX = Mathf.Clamp(Mathf.FloorToInt(sampleX / Chunk.CHUNK_SIZE), 0, worldSizeChunksX - 1);
-                int biomeCZ = Mathf.Clamp(Mathf.FloorToInt(sampleZ / Chunk.CHUNK_SIZE), 0, worldSizeChunksZ - 1);
-                VoxelBiomeSO biome = biomes[chunkBiomeMap[biomeCX, biomeCZ]];
-
                 int finalHeight = Mathf.RoundToInt(finalHeightFloat);
+
                 for (int y = 0; y <= finalHeight; y++)
                 {
                     BlockData block = null;
-                    if (y == finalHeight) block = biome.surfaceBlock;
-                    else if (y > finalHeight - 4) block = biome.subSurfaceBlock;
+                    if (y == finalHeight) block = chunkBiome.surfaceBlock;
+                    else if (y > finalHeight - 4) block = chunkBiome.subSurfaceBlock;
                     else block = bedrockBlock;
-
-                    if (block != null) SetBlockDataOnly(x, y, z, block);
+                    if (block != null) chunk.SetBlock(x, y, z, block);
                 }
             }
         }
-
-        Pass_GenerateStructures(totalWidth, totalDepth);
-
-        foreach (var chunk in chunks.Values) chunk.RegenerateMesh();
     }
 
-    // --- DECORATION SYSTEM ---
-    void Pass_GenerateStructures(int width, int depth)
+    float GetSmoothInfiniteBiomeHeight(float x, float z)
     {
-        Random.InitState(System.DateTime.Now.Millisecond);
+        // 1. Grid Coordinates
+        float u = (x / Chunk.CHUNK_SIZE);
+        float v = (z / Chunk.CHUNK_SIZE);
 
-        // 1. Create Occupation Map
-        bool[,] occupiedMap = new bool[width, depth];
+        int x0 = Mathf.FloorToInt(u);
+        int z0 = Mathf.FloorToInt(v);
 
-        for (int x = 0; x < width; x++)
+        float s = u - x0;
+        float t = v - z0;
+
+        // 2. Sample 4 corners using Voronoi Lookup
+        float h00 = GetBiomeHeightAtPos(x0, z0, x, z);
+        float h10 = GetBiomeHeightAtPos(x0 + 1, z0, x, z);
+        float h01 = GetBiomeHeightAtPos(x0, z0 + 1, x, z);
+        float h11 = GetBiomeHeightAtPos(x0 + 1, z0 + 1, x, z);
+
+        // 3. Bilinear Interpolation
+        return Mathf.Lerp(Mathf.Lerp(h00, h10, s), Mathf.Lerp(h01, h11, s), t);
+    }
+
+    float GetBiomeHeightAtPos(int chunkX, int chunkZ, float worldX, float worldZ)
+    {
+        // This is where the magic happens: We ask "What is the biome at this neighbor chunk?"
+        VoxelBiomeSO b = GetBiomeVoronoi(chunkX, chunkZ);
+        return b.baseHeight + (Mathf.PerlinNoise(worldX * b.terrainScale, worldZ * b.terrainScale) * b.terrainAmplitude);
+    }
+
+    // --- STRUCTURES ---
+    void GenerateStructuresForChunk(int cx, int cz)
+    {
+        if (!activeChunks.TryGetValue(new Vector2Int(cx, cz), out Chunk chunk)) return;
+
+        VoxelBiomeSO biome = GetBiomeVoronoi(cx, cz);
+        if (biome.structureGroups == null || biome.structureGroups.Count == 0) return;
+
+        int startX = cx * Chunk.CHUNK_SIZE;
+        int startZ = cz * Chunk.CHUNK_SIZE;
+
+        for (int x = 0; x < Chunk.CHUNK_SIZE; x++)
         {
-            for (int z = 0; z < depth; z++)
+            for (int z = 0; z < Chunk.CHUNK_SIZE; z++)
             {
-                if (occupiedMap[x, z]) continue;
-
-                // Biome Lookup (Same as before)
-                float warpX = (Mathf.PerlinNoise((x + warpOffset) * warpScale, (z + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
-                float warpZ = (Mathf.PerlinNoise((z + warpOffset) * warpScale, (x + warpOffset) * warpScale) * 2f - 1f) * warpStrength;
-
-                int biomeCX = Mathf.Clamp(Mathf.FloorToInt((x + warpX) / Chunk.CHUNK_SIZE), 0, worldSizeChunksX - 1);
-                int biomeCZ = Mathf.Clamp(Mathf.FloorToInt((z + warpZ) / Chunk.CHUNK_SIZE), 0, worldSizeChunksZ - 1);
-
-                VoxelBiomeSO biome = biomes[chunkBiomeMap[biomeCX, biomeCZ]];
-
-                if (biome.structureGroups == null || biome.structureGroups.Count == 0) continue;
-
+                int worldX = startX + x;
+                int worldZ = startZ + z;
                 foreach (var group in biome.structureGroups)
                 {
-                    // --- GRADIENT DENSITY LOGIC ---
                     float finalSpawnChance = 1.0f;
-
                     if (group.usePatchGeneration)
                     {
                         float noiseVal = Mathf.PerlinNoise(
-                            (x + warpOffset + group.GetHashCode()) * group.patchScale,
-                            (z + warpOffset + group.GetHashCode()) * group.patchScale
+                            (worldX + warpNoiseOffset + group.GetHashCode()) * group.patchScale,
+                            (worldZ + warpNoiseOffset + group.GetHashCode()) * group.patchScale
                         );
-
-                        // If below threshold, 0% chance (Empty Area)
-                        if (noiseVal < group.patchThreshold)
-                        {
-                            finalSpawnChance = 0f;
-                        }
-                        else
-                        {
-                            // Math: Map the noise from [Threshold -> 1.0] to [0.0 -> 1.0]
-                            // This creates the "Fade" at the edges.
-                            // Edge of forest = Low Chance. Center of forest = High Chance.
-                            float range = 1.0f - group.patchThreshold;
-                            float strength = (noiseVal - group.patchThreshold) / range;
-
-                            // Optional: Curve it to make centers tighter (Strength ^ 2)
-                            finalSpawnChance = strength;
-                        }
+                        if (noiseVal < group.patchThreshold) finalSpawnChance = 0f;
+                        else { float range = 1.0f - group.patchThreshold; finalSpawnChance = (noiseVal - group.patchThreshold) / range; }
                     }
-
-                    // If chance is 0, skip immediately
                     if (finalSpawnChance <= 0.001f) continue;
-
-                    // 2. Pick Random Structure
                     StructureDataSO structure = group.GetRandomStructure();
                     if (structure == null) continue;
-
-                    // 3. Roll Dice (Structure Density * Gradient Strength)
-                    // If we are at the edge, finalSpawnChance might be 0.1, making spawns very rare.
                     if (Random.value < (structure.spawnDensity * finalSpawnChance))
                     {
-                        int surfaceY = GetSurfaceHeightAt(x, z);
-                        BlockData ground = GetBlockDataOnly(x, surfaceY, z);
-
-                        if (ground == biome.surfaceBlock)
+                        int y = GetSurfaceHeightAt(worldX, worldZ);
+                        if (y <= 0) continue;
+                        BlockData surface = GetBlockDataOnly(worldX, y, worldZ);
+                        if (surface == biome.surfaceBlock)
                         {
-                            SpawnStructure(x, surfaceY + 1 + structure.yOffset, z, structure);
-
-                            // Mark Footprint
-                            int r = structure.spawnRadius;
-                            for (int ox = -r; ox <= r; ox++)
-                            {
-                                for (int oz = -r; oz <= r; oz++)
-                                {
-                                    int mapX = x + ox;
-                                    int mapZ = z + oz;
-                                    if (mapX >= 0 && mapX < width && mapZ >= 0 && mapZ < depth)
-                                    {
-                                        occupiedMap[mapX, mapZ] = true;
-                                    }
-                                }
-                            }
-                            break;
+                            SpawnStructure(worldX, y + 1 + structure.yOffset, worldZ, structure);
+                            goto NextBlock;
                         }
                     }
                 }
+            NextBlock:;
             }
         }
     }
+
+    // --- UTILITIES ---
+    bool AreNeighborsLoaded(Vector2Int coord)
+    {
+        if (!activeChunks.ContainsKey(coord + Vector2Int.up)) return false;
+        if (!activeChunks.ContainsKey(coord + Vector2Int.down)) return false;
+        if (!activeChunks.ContainsKey(coord + Vector2Int.left)) return false;
+        if (!activeChunks.ContainsKey(coord + Vector2Int.right)) return false;
+        return true;
+    }
+
+    bool IsChunkInLoadRange(Vector2Int coord)
+    {
+        if (player == null) return false;
+        int pCx = Mathf.FloorToInt(player.position.x / Chunk.CHUNK_SIZE);
+        int pCz = Mathf.FloorToInt(player.position.z / Chunk.CHUNK_SIZE);
+        int dist = Mathf.Max(Mathf.Abs(coord.x - pCx), Mathf.Abs(coord.y - pCz));
+        return dist <= (viewDistance + unloadBuffer);
+    }
+
+    void CreateChunkObject(int x, int z)
+    {
+        if (activeChunks.ContainsKey(new Vector2Int(x, z))) return;
+        GameObject go = new GameObject($"Chunk_{x}_{z}");
+        go.transform.parent = transform;
+        go.transform.position = new Vector3(x * Chunk.CHUNK_SIZE, 0, z * Chunk.CHUNK_SIZE);
+        Chunk c = go.AddComponent<Chunk>();
+        c.chunkCoord = new Vector2Int(x, z);
+        activeChunks[new Vector2Int(x, z)] = c;
+    }
+
     void SpawnStructure(int rootX, int rootY, int rootZ, StructureDataSO structureData)
     {
         var blocks = structureData.GetStructure();
-
-        // 1. Pick a Random Rotation (0, 1, 2, or 3)
-        // 0 = 0 deg, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg
         int rotation = Random.Range(0, 4);
-
         foreach (var kvp in blocks)
         {
             Vector3Int offset = kvp.Key;
             BlockData block = kvp.Value;
-
-            // 2. Rotate the offset
-            Vector3Int rotatedOffset = RotatePoint(offset, rotation);
-
-            int finalX = rootX + rotatedOffset.x;
-            int finalY = rootY + rotatedOffset.y;
-            int finalZ = rootZ + rotatedOffset.z;
-
-            SetBlockDataOnly(finalX, finalY, finalZ, block);
-
-            // Foundation Fix (Extends structure down)
-            if (offset.y == 0)
-            {
-                int checkY = finalY - 1;
-                int safety = 0;
-                while (GetBlockDataOnly(finalX, checkY, finalZ) == null && checkY > 0 && safety < 10)
-                {
-                    SetBlockDataOnly(finalX, checkY, finalZ, block);
-                    checkY--;
-                    safety++;
-                }
-            }
+            Vector3Int rotOffset = RotatePoint(offset, rotation);
+            SetBlockDataOnly(rootX + rotOffset.x, rootY + rotOffset.y, rootZ + rotOffset.z, block);
         }
     }
 
-    // --- ROTATION HELPER ---
     Vector3Int RotatePoint(Vector3Int p, int rotation)
     {
-        // Simple 2D rotation on X/Z plane
-        if (rotation == 0) return p;                                // 0 degrees
-        if (rotation == 1) return new Vector3Int(p.z, p.y, -p.x);   // 90 degrees
-        if (rotation == 2) return new Vector3Int(-p.x, p.y, -p.z);  // 180 degrees
-        return new Vector3Int(-p.z, p.y, p.x);                      // 270 degrees
+        if (rotation == 0) return p;
+        if (rotation == 1) return new Vector3Int(p.z, p.y, -p.x);
+        if (rotation == 2) return new Vector3Int(-p.x, p.y, -p.z);
+        return new Vector3Int(-p.z, p.y, p.x);
     }
 
-    // --- MATH HELPERS ---
-    Vector2Int GetChunkCoord(int x, int z)
+    public void ModifyBlock(Vector3 worldPos, BlockData newBlock)
     {
-        int cx = Mathf.FloorToInt((float)x / Chunk.CHUNK_SIZE);
-        int cz = Mathf.FloorToInt((float)z / Chunk.CHUNK_SIZE);
-        return new Vector2Int(cx, cz);
+        int x = Mathf.FloorToInt(worldPos.x); int y = Mathf.FloorToInt(worldPos.y); int z = Mathf.FloorToInt(worldPos.z);
+        SetBlockDataOnly(x, y, z, newBlock);
+        Vector2Int c = GetChunkCoord(x, z);
+        UpdateChunkMesh(c.x, c.y);
+        UpdateChunkMesh(c.x + 1, c.y); UpdateChunkMesh(c.x - 1, c.y);
+        UpdateChunkMesh(c.x, c.y + 1); UpdateChunkMesh(c.x, c.y - 1);
     }
 
     void SetBlockDataOnly(int x, int y, int z, BlockData data)
     {
         if (y < 0 || y >= Chunk.CHUNK_HEIGHT) return;
-
         Vector2Int coord = GetChunkCoord(x, z);
-        int cx = coord.x;
-        int cz = coord.y;
-        int lx = x - (cx * Chunk.CHUNK_SIZE);
-        int lz = z - (cz * Chunk.CHUNK_SIZE);
-
-        if (cx >= 0 && cx < worldSizeChunksX && cz >= 0 && cz < worldSizeChunksZ)
+        if (activeChunks.TryGetValue(coord, out Chunk chunk))
         {
-            if (chunks.TryGetValue(coord, out Chunk chunk))
-                chunk.SetBlock(lx, y, lz, data);
+            int lx = x - (coord.x * Chunk.CHUNK_SIZE);
+            int lz = z - (coord.y * Chunk.CHUNK_SIZE);
+            chunk.SetBlock(lx, y, lz, data);
         }
     }
 
     BlockData GetBlockDataOnly(int x, int y, int z)
     {
         if (y < 0 || y >= Chunk.CHUNK_HEIGHT) return null;
-
         Vector2Int coord = GetChunkCoord(x, z);
-        int cx = coord.x;
-        int cz = coord.y;
-        int lx = x - (cx * Chunk.CHUNK_SIZE);
-        int lz = z - (cz * Chunk.CHUNK_SIZE);
-
-        if (cx >= 0 && cx < worldSizeChunksX && cz >= 0 && cz < worldSizeChunksZ)
+        if (activeChunks.TryGetValue(coord, out Chunk chunk))
         {
-            if (chunks.TryGetValue(coord, out Chunk chunk))
-                return chunk.GetBlock(lx, y, lz);
+            int lx = x - (coord.x * Chunk.CHUNK_SIZE);
+            int lz = z - (coord.y * Chunk.CHUNK_SIZE);
+            return chunk.GetBlock(lx, y, lz);
         }
         return null;
+    }
+
+    public BlockData GetBlock(Vector3 worldPos)
+    {
+        return GetBlockDataOnly(Mathf.FloorToInt(worldPos.x), Mathf.FloorToInt(worldPos.y), Mathf.FloorToInt(worldPos.z));
     }
 
     int GetSurfaceHeightAt(int x, int z)
@@ -334,87 +497,29 @@ public class VoxelWorld : MonoBehaviour
 
     void UpdateChunkMesh(int cx, int cz)
     {
-        if (chunks.TryGetValue(new Vector2Int(cx, cz), out Chunk c)) c.RegenerateMesh();
+        if (activeChunks.TryGetValue(new Vector2Int(cx, cz), out Chunk c)) c.RegenerateMesh();
     }
 
-    // --- BIOME LOGIC ---
-    float GetBilinearSmoothedHeight(float sampleX, float sampleZ)
-    {
-        float u = (sampleX / (float)Chunk.CHUNK_SIZE) - 0.5f;
-        float v = (sampleZ / (float)Chunk.CHUNK_SIZE) - 0.5f;
-        int x0 = Mathf.FloorToInt(u); int z0 = Mathf.FloorToInt(v);
-        int x1 = x0 + 1; int z1 = z0 + 1;
-        float s = u - x0; float t = v - z0;
-        x0 = Mathf.Clamp(x0, 0, worldSizeChunksX - 1); x1 = Mathf.Clamp(x1, 0, worldSizeChunksX - 1);
-        z0 = Mathf.Clamp(z0, 0, worldSizeChunksZ - 1); z1 = Mathf.Clamp(z1, 0, worldSizeChunksZ - 1);
-        float h00 = CalculateBiomeHeight(sampleX, sampleZ, biomes[chunkBiomeMap[x0, z0]]);
-        float h10 = CalculateBiomeHeight(sampleX, sampleZ, biomes[chunkBiomeMap[x1, z0]]);
-        float h01 = CalculateBiomeHeight(sampleX, sampleZ, biomes[chunkBiomeMap[x0, z1]]);
-        float h11 = CalculateBiomeHeight(sampleX, sampleZ, biomes[chunkBiomeMap[x1, z1]]);
-        return Mathf.Lerp(Mathf.Lerp(h00, h10, s), Mathf.Lerp(h01, h11, s), t);
-    }
-    float CalculateBiomeHeight(float x, float z, VoxelBiomeSO biome)
-    {
-        return biome.baseHeight + (Mathf.PerlinNoise(x * biome.terrainScale, z * biome.terrainScale) * biome.terrainAmplitude);
-    }
-    void GenerateBiomeMap()
-    {
-        chunkBiomeMap = new int[worldSizeChunksX, worldSizeChunksZ];
-        for (int x = 0; x < worldSizeChunksX; x++) for (int z = 0; z < worldSizeChunksZ; z++) chunkBiomeMap[x, z] = -1;
-        int safety = 0;
-        while (HasEmptySpots() && safety++ < 10000)
-        {
-            Vector2Int seed = GetRandomEmptyChunk(); if (seed.x == -1) break;
-            float temp = Mathf.PerlinNoise((seed.x + tempOffset) * temperatureScale, (seed.y + tempOffset) * temperatureScale);
-            int bIndex = PickBiomeForTemperature(temp);
-            GrowBiome(seed, bIndex, biomes[bIndex].targetSize);
-        }
-    }
-    void GrowBiome(Vector2Int start, int biomeIndex, int targetSize)
-    {
-        Queue<Vector2Int> q = new Queue<Vector2Int>(); q.Enqueue(start); chunkBiomeMap[start.x, start.y] = biomeIndex;
-        int size = 1;
-        while (q.Count > 0 && size < targetSize)
-        {
-            Vector2Int c = q.Dequeue();
-            Vector2Int[] n = { c + Vector2Int.up, c + Vector2Int.down, c + Vector2Int.left, c + Vector2Int.right };
-            Shuffle(n);
-            foreach (var next in n)
-            {
-                if (next.x < 0 || next.x >= worldSizeChunksX || next.y < 0 || next.y >= worldSizeChunksZ) continue;
-                if (chunkBiomeMap[next.x, next.y] == -1) { chunkBiomeMap[next.x, next.y] = biomeIndex; q.Enqueue(next); size++; }
-            }
-        }
-    }
-    // Add this to VoxelWorld.cs
     public Chunk GetChunkByCoord(int cx, int cz)
     {
-        if (chunks.TryGetValue(new Vector2Int(cx, cz), out Chunk c))
-        {
-            return c;
-        }
+        if (activeChunks.TryGetValue(new Vector2Int(cx, cz), out Chunk c)) return c;
         return null;
     }
-    int PickBiomeForTemperature(float temp)
+
+    Vector2Int GetChunkCoord(int x, int z)
     {
-        List<int> c = new List<int>();
-        for (int i = 0; i < biomes.Length; i++)
-        {
-            if (temp >= biomes[i].optimalTemperature - biomes[i].temperatureTolerance && temp <= biomes[i].optimalTemperature + biomes[i].temperatureTolerance) c.Add(i);
-        }
-        return c.Count == 0 ? 0 : c[Random.Range(0, c.Count)];
+        return new Vector2Int(Mathf.FloorToInt((float)x / Chunk.CHUNK_SIZE), Mathf.FloorToInt((float)z / Chunk.CHUNK_SIZE));
     }
-    bool HasEmptySpots() { foreach (int i in chunkBiomeMap) if (i == -1) return true; return false; }
-    Vector2Int GetRandomEmptyChunk()
+
+    public void RegenerateWorld()
     {
-        for (int i = 0; i < 50; i++) { int x = Random.Range(0, worldSizeChunksX); int z = Random.Range(0, worldSizeChunksZ); if (chunkBiomeMap[x, z] == -1) return new Vector2Int(x, z); }
-        for (int x = 0; x < worldSizeChunksX; x++) for (int z = 0; z < worldSizeChunksZ; z++) if (chunkBiomeMap[x, z] == -1) return new Vector2Int(x, z);
-        return new Vector2Int(-1, -1);
-    }
-    void Shuffle<T>(T[] a) { for (int i = 0; i < a.Length; i++) { int r = Random.Range(i, a.Length); T t = a[r]; a[r] = a[i]; a[i] = t; } }
-    void CreateChunk(int x, int z)
-    {
-        GameObject go = new GameObject($"Chunk_{x}_{z}"); go.transform.parent = transform; go.transform.position = new Vector3(x * Chunk.CHUNK_SIZE, 0, z * Chunk.CHUNK_SIZE);
-        Chunk c = go.AddComponent<Chunk>(); c.chunkCoord = new Vector2Int(x, z); chunks[new Vector2Int(x, z)] = c;
+        StopAllCoroutines();
+        chunksMeshQueued.Clear(); chunksDataQueued.Clear(); creationList.Clear(); meshingList.Clear();
+        foreach (var c in activeChunks.Values) if (c != null) Destroy(c.gameObject);
+        activeChunks.Clear();
+        warpNoiseOffset = Random.Range(0f, 10000f);
+        seedOffset = Random.Range(0, 100000);
+        lastPlayerChunkCoord = new Vector2Int(-999999, -999999);
+        StartCoroutine(ProcessWorldQueues());
     }
 }

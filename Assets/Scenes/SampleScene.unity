@@ -457,21 +457,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e130762e28759ab40b6f3884e5e044af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  worldSizeChunksX: 20
-  worldSizeChunksZ: 20
   defaultMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
   bedrockBlock: {fileID: 11400000, guid: 62373b3fdf8fae044b5beedd6a065201, type: 2}
+  player: {fileID: 1975112088}
+  viewDistance: 6
+  unloadBuffer: 2
   biomes:
   - {fileID: 11400000, guid: 3a04ee722b3c5ff45a50cde46b6fc151, type: 2}
   - {fileID: 11400000, guid: 88fc9bbe7803c8145b9fe25f15e3abb0, type: 2}
   - {fileID: 11400000, guid: 445cc32129782e846aac359ab0f2491d, type: 2}
   - {fileID: 11400000, guid: 900338bdcedcea04f831ec42b4f55bec, type: 2}
+  biomeCellSize: 15
   temperatureScale: 0.1
+  biomeOffset: 5000
   warpStrength: 15
   warpScale: 0.03
   globalScale: 0.01
   globalAmplitude: 50
   globalHeightOffset: 0
+  maxMsPerFrame: 8
 --- !u!4 &1387211311
 Transform:
   m_ObjectHideFlags: 0
@@ -556,7 +560,7 @@ Transform:
   m_GameObject: {fileID: 1975112087}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 133.8, y: 33.1, z: 122.8}
+  m_LocalPosition: {x: 133.8, y: 106.5, z: 122.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
