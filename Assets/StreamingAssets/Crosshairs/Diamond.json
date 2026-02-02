@@ -1,0 +1,50 @@
+{
+    "parts": [
+        {
+            "name": "Dot",
+            "shape": 3,
+            "offset": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "width": 5.0,
+            "height": 5.0,
+            "rotation": 0.0,
+            "cachedColor": {
+                "r": 1.0,
+                "g": 1.0,
+                "b": 1.0,
+                "a": 1.0
+            },
+            "hue": 0.0,
+            "saturation": 0.0,
+            "value": 1.0,
+            "isOutline": false,
+            "outlineThickness": 2.0,
+            "isVisible": true
+        },
+        {
+            "name": "Layer",
+            "shape": 3,
+            "offset": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "width": 25.0,
+            "height": 25.0,
+            "rotation": 0.0,
+            "cachedColor": {
+                "r": 1.0,
+                "g": 1.0,
+                "b": 1.0,
+                "a": 1.0
+            },
+            "hue": 0.0,
+            "saturation": 0.0,
+            "value": 1.0,
+            "isOutline": true,
+            "outlineThickness": 3.0,
+            "isVisible": true
+        }
+    ]
+}
