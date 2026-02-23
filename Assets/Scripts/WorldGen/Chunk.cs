@@ -35,6 +35,36 @@ public class Chunk : MonoBehaviour
 
     public Vector2Int chunkCoord;
 
+    // --- SAVING SYSTEM ---
+    public bool isModified = false;
+
+    public class ChunkSaveData
+    {
+        public byte[] blocks;
+        public byte[] fluidLevels;
+        public short[] waterBodyIDs;
+    }
+
+    public ChunkSaveData GetSaveData()
+    {
+        return new ChunkSaveData
+        {
+            blocks = (byte[])blocks.Clone(),
+            fluidLevels = (byte[])fluidLevels.Clone(),
+            waterBodyIDs = (short[])waterBodyIDs.Clone()
+        };
+    }
+
+    public void LoadSaveData(ChunkSaveData data)
+    {
+        blocks = (byte[])data.blocks.Clone();
+        fluidLevels = (byte[])data.fluidLevels.Clone();
+        waterBodyIDs = (short[])data.waterBodyIDs.Clone();
+        // Keep it marked as modified so it doesn't get lost on the next unload
+        isModified = true;
+    }
+    // ---------------------
+
     void Awake()
     {
         terrainFilter = GetComponent<MeshFilter>();
@@ -93,6 +123,7 @@ public class Chunk : MonoBehaviour
 
         blocks[index] = newID;
         waterBodyIDs[index] = -1;
+        isModified = true; // Flag chunk as modified
 
         // --- MASS CONSERVATION CHECK ---
         if (!isSimulation)
@@ -128,6 +159,7 @@ public class Chunk : MonoBehaviour
     {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) return;
         fluidLevels[GetIndex(x, y, z)] = level;
+        isModified = true;
     }
     public short GetBodyID(int x, int y, int z)
     {
@@ -138,6 +170,7 @@ public class Chunk : MonoBehaviour
     {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) return;
         waterBodyIDs[GetIndex(x, y, z)] = id;
+        isModified = true;
     }
     public void WakeNeighbors(int x, int y, int z) { LiquidSimulator.Instance?.WakeUpArea(this, x, y, z); }
 

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9cc423f625e24b4c9e09d6e06bdb0c7, type: 3}
   m_Name: CactusGroup
   m_EditorClassIdentifier: 
-  usePatchGeneration: 0
+  usePatchGeneration: 1
   patchScale: 0.1
   patchThreshold: 0.607
   structures:

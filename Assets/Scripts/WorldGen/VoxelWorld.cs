@@ -2,6 +2,8 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System;
 
 public class VoxelWorld : MonoBehaviour
 {
@@ -32,8 +34,15 @@ public class VoxelWorld : MonoBehaviour
     [Header("5. Async Performance")]
     public float maxMsPerFrame = 8f;
 
+    [Header("6. Save / Load System")]
+    public string saveFileName = "World1";
+    public bool loadOnStart = true;
+
     // --- INTERNAL DATA ---
     private Dictionary<Vector2Int, Chunk> activeChunks = new Dictionary<Vector2Int, Chunk>();
+
+    // Chunk Save Data Dictionary
+    private Dictionary<Vector2Int, Chunk.ChunkSaveData> savedChunkData = new Dictionary<Vector2Int, Chunk.ChunkSaveData>();
 
     // Queues
     private HashSet<Vector2Int> chunksDataQueued = new HashSet<Vector2Int>();
@@ -56,11 +65,18 @@ public class VoxelWorld : MonoBehaviour
             else if (Camera.main != null) player = Camera.main.transform;
         }
 
-        warpNoiseOffset = Random.Range(0f, 10000f);
-        biomeOffset += Random.Range(0f, 10000f);
-        seedOffset = Random.Range(0, 100000);
-
-        StartCoroutine(ProcessWorldQueues());
+        string path = Path.Combine(Application.persistentDataPath, saveFileName + ".save");
+        if (loadOnStart && File.Exists(path))
+        {
+            LoadWorld();
+        }
+        else
+        {
+            warpNoiseOffset = UnityEngine.Random.Range(0f, 10000f);
+            biomeOffset += UnityEngine.Random.Range(0f, 10000f);
+            seedOffset = UnityEngine.Random.Range(0, 100000);
+            StartCoroutine(ProcessWorldQueues());
+        }
     }
 
     void Update()
@@ -78,10 +94,99 @@ public class VoxelWorld : MonoBehaviour
             UpdateVisibleChunks(currentChunkCoord);
         }
 
-        if (Input.GetKey(KeyCode.RightControl) && Input.GetKeyDown(KeyCode.R))
+        // Save/Load/Regen Hotkeys
+        if (Input.GetKey(KeyCode.RightControl))
         {
-            RegenerateWorld();
+            if (Input.GetKeyDown(KeyCode.R)) RegenerateWorld(true);  // True = Wipe everything and randomize
+            if (Input.GetKeyDown(KeyCode.S)) SaveWorld();
+            if (Input.GetKeyDown(KeyCode.L)) LoadWorld();
         }
+    }
+
+    // --- SAVE / LOAD LOGIC ---
+    public void SaveWorld()
+    {
+        string path = Path.Combine(Application.persistentDataPath, saveFileName + ".save");
+        using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.Create)))
+        {
+            // 1. Save Seeds
+            writer.Write(warpNoiseOffset);
+            writer.Write(biomeOffset);
+            writer.Write(seedOffset);
+
+            // 2. Ensure active modified chunks are in the dictionary before saving
+            foreach (var kvp in activeChunks)
+            {
+                if (kvp.Value != null && kvp.Value.isModified)
+                {
+                    savedChunkData[kvp.Key] = kvp.Value.GetSaveData();
+                }
+            }
+
+            // 3. Write chunk count
+            writer.Write(savedChunkData.Count);
+
+            // 4. Save Chunk Data
+            int arrayLength = Chunk.CHUNK_SIZE * Chunk.CHUNK_HEIGHT * Chunk.CHUNK_SIZE;
+            int shortArrayByteLength = arrayLength * 2;
+
+            foreach (var kvp in savedChunkData)
+            {
+                writer.Write(kvp.Key.x);
+                writer.Write(kvp.Key.y);
+                writer.Write(kvp.Value.blocks);
+                writer.Write(kvp.Value.fluidLevels);
+
+                // Convert short[] to byte[] for fast writing
+                byte[] waterBytes = new byte[shortArrayByteLength];
+                Buffer.BlockCopy(kvp.Value.waterBodyIDs, 0, waterBytes, 0, shortArrayByteLength);
+                writer.Write(waterBytes);
+            }
+        }
+        Debug.Log($"World saved to: {path}");
+    }
+
+    public void LoadWorld()
+    {
+        string path = Path.Combine(Application.persistentDataPath, saveFileName + ".save");
+        if (!File.Exists(path))
+        {
+            Debug.LogWarning("No save file found at " + path);
+            return;
+        }
+
+        using (BinaryReader reader = new BinaryReader(File.Open(path, FileMode.Open)))
+        {
+            // 1. Load Seeds
+            warpNoiseOffset = reader.ReadSingle();
+            biomeOffset = reader.ReadSingle();
+            seedOffset = reader.ReadInt32();
+
+            // 2. Load Chunk Data
+            savedChunkData.Clear();
+            int chunkCount = reader.ReadInt32();
+
+            int arrayLength = Chunk.CHUNK_SIZE * Chunk.CHUNK_HEIGHT * Chunk.CHUNK_SIZE;
+            int shortArrayByteLength = arrayLength * 2;
+
+            for (int i = 0; i < chunkCount; i++)
+            {
+                Vector2Int coord = new Vector2Int(reader.ReadInt32(), reader.ReadInt32());
+                Chunk.ChunkSaveData data = new Chunk.ChunkSaveData();
+
+                data.blocks = reader.ReadBytes(arrayLength);
+                data.fluidLevels = reader.ReadBytes(arrayLength);
+
+                byte[] waterBytes = reader.ReadBytes(shortArrayByteLength);
+                data.waterBodyIDs = new short[arrayLength];
+                Buffer.BlockCopy(waterBytes, 0, data.waterBodyIDs, 0, shortArrayByteLength);
+
+                savedChunkData[coord] = data;
+            }
+        }
+
+        Debug.Log($"World loaded from: {path}");
+        RegenerateWorld(false); // Reload with loaded seeds and dictionary, preventing randomized wipes
     }
 
     // --- CHUNK MANAGEMENT ---
@@ -113,6 +218,12 @@ public class VoxelWorld : MonoBehaviour
         {
             if (activeChunks.TryGetValue(coord, out Chunk c))
             {
+                // Save modified chunks to memory before destroying
+                if (c != null && c.isModified)
+                {
+                    savedChunkData[coord] = c.GetSaveData();
+                }
+
                 activeChunks.Remove(coord);
                 if (c != null) Destroy(c.gameObject);
                 if (chunksDataQueued.Contains(coord)) chunksDataQueued.Remove(coord);
@@ -152,8 +263,23 @@ public class VoxelWorld : MonoBehaviour
                 if (!IsChunkInLoadRange(coord)) continue;
 
                 CreateChunkObject(coord.x, coord.y);
-                GenerateChunkTerrainData(coord.x, coord.y);
-                GenerateStructuresForChunk(coord.x, coord.y);
+
+                // Load from memory if we have saved modifications, otherwise generate fresh
+                if (savedChunkData.TryGetValue(coord, out Chunk.ChunkSaveData data))
+                {
+                    activeChunks[coord].LoadSaveData(data);
+                }
+                else
+                {
+                    GenerateChunkTerrainData(coord.x, coord.y);
+                    GenerateStructuresForChunk(coord.x, coord.y);
+
+                    // Reset flag so chunks aren't marked 'modified' just by spawning
+                    if (activeChunks.TryGetValue(coord, out Chunk c))
+                    {
+                        c.isModified = false;
+                    }
+                }
 
                 if (!chunksMeshQueued.Contains(coord))
                 {
@@ -205,10 +331,8 @@ public class VoxelWorld : MonoBehaviour
     }
 
     // --- INFINITE VORONOI BIOMES ---
-    // This adapts "Seed and Grow" to infinite math
     VoxelBiomeSO GetBiomeVoronoi(int chunkX, int chunkZ)
     {
-        // 1. Identify which "Macro Cell" this chunk belongs to
         int cellScale = Mathf.Max(1, biomeCellSize);
         int cellX = Mathf.FloorToInt((float)chunkX / cellScale);
         int cellZ = Mathf.FloorToInt((float)chunkZ / cellScale);
@@ -216,7 +340,6 @@ public class VoxelWorld : MonoBehaviour
         float minDist = float.MaxValue;
         Vector2Int bestSeed = Vector2Int.zero;
 
-        // 2. Search neighbors (3x3 grid) to find the closest Seed
         for (int i = -1; i <= 1; i++)
         {
             for (int j = -1; j <= 1; j++)
@@ -224,15 +347,11 @@ public class VoxelWorld : MonoBehaviour
                 int cx = cellX + i;
                 int cz = cellZ + j;
 
-                // Deterministic Random Seed for this cell
-                // We assume this cell has a "Seed Point" somewhere inside it
-                Random.InitState((cx * 8901) + (cz * 2345) + seedOffset);
-                int localX = Random.Range(0, cellScale);
-                int localZ = Random.Range(0, cellScale);
+                UnityEngine.Random.InitState((cx * 8901) + (cz * 2345) + seedOffset);
+                int localX = UnityEngine.Random.Range(0, cellScale);
+                int localZ = UnityEngine.Random.Range(0, cellScale);
 
                 Vector2Int seedPos = new Vector2Int(cx * cellScale + localX, cz * cellScale + localZ);
-
-                // Is this seed closer than the last one?
                 float dist = Vector2Int.Distance(new Vector2Int(chunkX, chunkZ), seedPos);
 
                 if (dist < minDist)
@@ -243,8 +362,6 @@ public class VoxelWorld : MonoBehaviour
             }
         }
 
-        // 3. The Winner determines the biome for this chunk
-        // We use the Seed's position for temperature, ensuring the whole patch is consistent
         float noise = Mathf.PerlinNoise((bestSeed.x + biomeOffset) * temperatureScale, (bestSeed.y + biomeOffset) * temperatureScale);
         return PickBiomeForTemperature(noise);
     }
@@ -272,15 +389,12 @@ public class VoxelWorld : MonoBehaviour
     }
 
     // --- TERRAIN GENERATION ---
-
     void GenerateChunkTerrainData(int cx, int cz)
     {
         if (!activeChunks.TryGetValue(new Vector2Int(cx, cz), out Chunk chunk)) return;
 
         int startX = cx * Chunk.CHUNK_SIZE;
         int startZ = cz * Chunk.CHUNK_SIZE;
-
-        // Pre-fetch biome for block filling (center of chunk)
         VoxelBiomeSO chunkBiome = GetBiomeVoronoi(cx, cz);
 
         for (int x = 0; x < Chunk.CHUNK_SIZE; x++)
@@ -290,16 +404,12 @@ public class VoxelWorld : MonoBehaviour
                 int worldX = startX + x;
                 int worldZ = startZ + z;
 
-                // 1. WARP
                 float wX = (Mathf.PerlinNoise((worldX + warpNoiseOffset) * warpScale, (worldZ + warpNoiseOffset) * warpScale) * 2f - 1f) * warpStrength;
                 float wZ = (Mathf.PerlinNoise((worldZ + warpNoiseOffset) * warpScale, (worldX + warpNoiseOffset) * warpScale) * 2f - 1f) * warpStrength;
                 float sX = worldX + wX;
                 float sZ = worldZ + wZ;
 
-                // 2. SMOOTH BIOME HEIGHT (Bilinear blend of Voronoi neighbors)
                 float biomeHeight = GetSmoothInfiniteBiomeHeight(sX, sZ);
-
-                // 3. GLOBAL NOISE
                 float globalNoise = Mathf.PerlinNoise(sX * globalScale, sZ * globalScale) * globalAmplitude;
                 float finalHeightFloat = biomeHeight + globalNoise + globalHeightOffset;
 
@@ -319,7 +429,6 @@ public class VoxelWorld : MonoBehaviour
 
     float GetSmoothInfiniteBiomeHeight(float x, float z)
     {
-        // 1. Grid Coordinates
         float u = (x / Chunk.CHUNK_SIZE);
         float v = (z / Chunk.CHUNK_SIZE);
 
@@ -329,19 +438,16 @@ public class VoxelWorld : MonoBehaviour
         float s = u - x0;
         float t = v - z0;
 
-        // 2. Sample 4 corners using Voronoi Lookup
         float h00 = GetBiomeHeightAtPos(x0, z0, x, z);
         float h10 = GetBiomeHeightAtPos(x0 + 1, z0, x, z);
         float h01 = GetBiomeHeightAtPos(x0, z0 + 1, x, z);
         float h11 = GetBiomeHeightAtPos(x0 + 1, z0 + 1, x, z);
 
-        // 3. Bilinear Interpolation
         return Mathf.Lerp(Mathf.Lerp(h00, h10, s), Mathf.Lerp(h01, h11, s), t);
     }
 
     float GetBiomeHeightAtPos(int chunkX, int chunkZ, float worldX, float worldZ)
     {
-        // This is where the magic happens: We ask "What is the biome at this neighbor chunk?"
         VoxelBiomeSO b = GetBiomeVoronoi(chunkX, chunkZ);
         return b.baseHeight + (Mathf.PerlinNoise(worldX * b.terrainScale, worldZ * b.terrainScale) * b.terrainAmplitude);
     }
@@ -378,7 +484,7 @@ public class VoxelWorld : MonoBehaviour
                     if (finalSpawnChance <= 0.001f) continue;
                     StructureDataSO structure = group.GetRandomStructure();
                     if (structure == null) continue;
-                    if (Random.value < (structure.spawnDensity * finalSpawnChance))
+                    if (UnityEngine.Random.value < (structure.spawnDensity * finalSpawnChance))
                     {
                         int y = GetSurfaceHeightAt(worldX, worldZ);
                         if (y <= 0) continue;
@@ -428,7 +534,7 @@ public class VoxelWorld : MonoBehaviour
     void SpawnStructure(int rootX, int rootY, int rootZ, StructureDataSO structureData)
     {
         var blocks = structureData.GetStructure();
-        int rotation = Random.Range(0, 4);
+        int rotation = UnityEngine.Random.Range(0, 4);
         foreach (var kvp in blocks)
         {
             Vector3Int offset = kvp.Key;
@@ -511,14 +617,21 @@ public class VoxelWorld : MonoBehaviour
         return new Vector2Int(Mathf.FloorToInt((float)x / Chunk.CHUNK_SIZE), Mathf.FloorToInt((float)z / Chunk.CHUNK_SIZE));
     }
 
-    public void RegenerateWorld()
+    public void RegenerateWorld(bool generateNewSeeds = true)
     {
         StopAllCoroutines();
         chunksMeshQueued.Clear(); chunksDataQueued.Clear(); creationList.Clear(); meshingList.Clear();
+
+        if (generateNewSeeds)
+        {
+            savedChunkData.Clear();
+            warpNoiseOffset = UnityEngine.Random.Range(0f, 10000f);
+            seedOffset = UnityEngine.Random.Range(0, 100000);
+        }
+
         foreach (var c in activeChunks.Values) if (c != null) Destroy(c.gameObject);
         activeChunks.Clear();
-        warpNoiseOffset = Random.Range(0f, 10000f);
-        seedOffset = Random.Range(0, 100000);
+
         lastPlayerChunkCoord = new Vector2Int(-999999, -999999);
         StartCoroutine(ProcessWorldQueues());
     }
