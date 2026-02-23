@@ -16,4 +16,8 @@ MonoBehaviour:
   blockPalette:
   - {fileID: 11400000, guid: 2b3d72736b1587f45bae17976fdeee28, type: 2}
   yOffset: 0
-  spawnDensity: 0.0046
+  spawnDensity: 0.0141
+  spawnRadius: 3
+  usePatchGeneration: 0
+  patchScale: 0.05
+  patchThreshold: 0.5

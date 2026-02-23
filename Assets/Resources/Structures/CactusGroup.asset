@@ -17,4 +17,4 @@ MonoBehaviour:
   patchThreshold: 0.607
   structures:
   - structure: {fileID: 11400000, guid: 27bc0203c1470bd4bb776ae2853be44a, type: 2}
-    weight: 1
+    weight: 2

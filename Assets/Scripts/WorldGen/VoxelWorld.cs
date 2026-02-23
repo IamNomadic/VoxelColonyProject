@@ -109,12 +109,10 @@ public class VoxelWorld : MonoBehaviour
         string path = Path.Combine(Application.persistentDataPath, saveFileName + ".save");
         using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.Create)))
         {
-            // 1. Save Seeds
             writer.Write(warpNoiseOffset);
             writer.Write(biomeOffset);
             writer.Write(seedOffset);
 
-            // 2. Ensure active modified chunks are in the dictionary before saving
             foreach (var kvp in activeChunks)
             {
                 if (kvp.Value != null && kvp.Value.isModified)
@@ -123,10 +121,8 @@ public class VoxelWorld : MonoBehaviour
                 }
             }
 
-            // 3. Write chunk count
             writer.Write(savedChunkData.Count);
 
-            // 4. Save Chunk Data
             int arrayLength = Chunk.CHUNK_SIZE * Chunk.CHUNK_HEIGHT * Chunk.CHUNK_SIZE;
             int shortArrayByteLength = arrayLength * 2;
 
@@ -137,7 +133,6 @@ public class VoxelWorld : MonoBehaviour
                 writer.Write(kvp.Value.blocks);
                 writer.Write(kvp.Value.fluidLevels);
 
-                // Convert short[] to byte[] for fast writing
                 byte[] waterBytes = new byte[shortArrayByteLength];
                 Buffer.BlockCopy(kvp.Value.waterBodyIDs, 0, waterBytes, 0, shortArrayByteLength);
                 writer.Write(waterBytes);
@@ -157,12 +152,10 @@ public class VoxelWorld : MonoBehaviour
 
         using (BinaryReader reader = new BinaryReader(File.Open(path, FileMode.Open)))
         {
-            // 1. Load Seeds
             warpNoiseOffset = reader.ReadSingle();
             biomeOffset = reader.ReadSingle();
             seedOffset = reader.ReadInt32();
 
-            // 2. Load Chunk Data
             savedChunkData.Clear();
             int chunkCount = reader.ReadInt32();
 
@@ -186,7 +179,7 @@ public class VoxelWorld : MonoBehaviour
         }
 
         Debug.Log($"World loaded from: {path}");
-        RegenerateWorld(false); // Reload with loaded seeds and dictionary, preventing randomized wipes
+        RegenerateWorld(false);
     }
 
     // --- CHUNK MANAGEMENT ---
@@ -218,7 +211,6 @@ public class VoxelWorld : MonoBehaviour
         {
             if (activeChunks.TryGetValue(coord, out Chunk c))
             {
-                // Save modified chunks to memory before destroying
                 if (c != null && c.isModified)
                 {
                     savedChunkData[coord] = c.GetSaveData();
@@ -242,7 +234,6 @@ public class VoxelWorld : MonoBehaviour
             IsGenerating = true;
             timer.Restart();
 
-            // PHASE 1: PRIORITIZE
             if (player != null && creationList.Count > 0)
             {
                 Vector2Int pCoord = GetChunkCoord(Mathf.FloorToInt(player.position.x), Mathf.FloorToInt(player.position.z));
@@ -253,7 +244,6 @@ public class VoxelWorld : MonoBehaviour
                 });
             }
 
-            // PHASE 2: CREATE DATA
             while (creationList.Count > 0 && timer.ElapsedMilliseconds < maxMsPerFrame)
             {
                 Vector2Int coord = creationList[0];
@@ -264,7 +254,6 @@ public class VoxelWorld : MonoBehaviour
 
                 CreateChunkObject(coord.x, coord.y);
 
-                // Load from memory if we have saved modifications, otherwise generate fresh
                 if (savedChunkData.TryGetValue(coord, out Chunk.ChunkSaveData data))
                 {
                     activeChunks[coord].LoadSaveData(data);
@@ -274,7 +263,6 @@ public class VoxelWorld : MonoBehaviour
                     GenerateChunkTerrainData(coord.x, coord.y);
                     GenerateStructuresForChunk(coord.x, coord.y);
 
-                    // Reset flag so chunks aren't marked 'modified' just by spawning
                     if (activeChunks.TryGetValue(coord, out Chunk c))
                     {
                         c.isModified = false;
@@ -288,7 +276,6 @@ public class VoxelWorld : MonoBehaviour
                 }
             }
 
-            // PHASE 3: GENERATE MESHES
             if (timer.ElapsedMilliseconds < maxMsPerFrame && meshingList.Count > 0)
             {
                 if (player != null)
@@ -449,7 +436,16 @@ public class VoxelWorld : MonoBehaviour
     float GetBiomeHeightAtPos(int chunkX, int chunkZ, float worldX, float worldZ)
     {
         VoxelBiomeSO b = GetBiomeVoronoi(chunkX, chunkZ);
-        return b.baseHeight + (Mathf.PerlinNoise(worldX * b.terrainScale, worldZ * b.terrainScale) * b.terrainAmplitude);
+
+        float vHeightNoise = Mathf.PerlinNoise((worldX + biomeOffset + 1000f) * b.varianceNoiseScale, (worldZ + biomeOffset + 1000f) * b.varianceNoiseScale) * 2f - 1f;
+        float vAmpNoise = Mathf.PerlinNoise((worldX + biomeOffset + 2000f) * b.varianceNoiseScale, (worldZ + biomeOffset + 2000f) * b.varianceNoiseScale) * 2f - 1f;
+        float vScaleNoise = Mathf.PerlinNoise((worldX + biomeOffset + 3000f) * b.varianceNoiseScale, (worldZ + biomeOffset + 3000f) * b.varianceNoiseScale) * 2f - 1f;
+
+        float finalBaseHeight = b.baseHeight + (vHeightNoise * b.baseHeightVariance);
+        float finalAmplitude = b.terrainAmplitude + (vAmpNoise * b.terrainAmplitudeVariance);
+        float finalScale = b.terrainScale + (vScaleNoise * b.terrainScaleVariance);
+
+        return finalBaseHeight + (Mathf.PerlinNoise(worldX * finalScale, worldZ * finalScale) * finalAmplitude);
     }
 
     // --- STRUCTURES ---
@@ -621,6 +617,9 @@ public class VoxelWorld : MonoBehaviour
     {
         StopAllCoroutines();
         chunksMeshQueued.Clear(); chunksDataQueued.Clear(); creationList.Clear(); meshingList.Clear();
+
+        // NEW: Tell PawnSpawner to purge its active units
+        FindObjectOfType<PawnSpawner>()?.ClearAllPawns();
 
         if (generateNewSeeds)
         {

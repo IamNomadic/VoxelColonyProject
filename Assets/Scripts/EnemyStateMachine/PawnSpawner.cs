@@ -37,6 +37,19 @@ public class PawnSpawner : MonoBehaviour
         StartCoroutine(PopulationLoop());
     }
 
+    // NEW: Clears all current pawns in the world
+    public void ClearAllPawns()
+    {
+        foreach (var entry in populationList)
+        {
+            foreach (var pawn in entry.activeInstances)
+            {
+                if (pawn != null) Destroy(pawn);
+            }
+            entry.activeInstances.Clear();
+        }
+    }
+
     IEnumerator PopulationLoop()
     {
         // Wait until world has started generating
