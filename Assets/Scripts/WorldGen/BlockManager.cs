@@ -118,6 +118,7 @@ public class BlockManager : MonoBehaviour
         b.blockMaterial = worldMaterial;
         b.height = 1.0f;
         b.isLiquid = false;
+        b.durability = 1.0f; // NEW: Give runtime blocks a default break time
         b.isTransparent = false;
         b.topUV = Vector2.zero;
         b.sideUV = Vector2.zero;

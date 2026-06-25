@@ -476,6 +476,8 @@ MonoBehaviour:
   globalAmplitude: 50
   globalHeightOffset: 0
   maxMsPerFrame: 8
+  saveFileName: World1
+  loadOnStart: 1
 --- !u!4 &1387211311
 Transform:
   m_ObjectHideFlags: 0
@@ -544,6 +546,7 @@ GameObject:
   - component: {fileID: 1975112092}
   - component: {fileID: 1975112093}
   - component: {fileID: 1975112094}
+  - component: {fileID: 1975112095}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -583,6 +586,9 @@ MonoBehaviour:
   moveSpeed: 10
   sprintMultiplier: 3
   verticalSpeed: 10
+  isFlying: 1
+  gravity: -20
+  jumpSpeed: 8
   mouseSensitivity: 4
   invertY: 0
   minPitch: -89
@@ -659,6 +665,27 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   currentSlotIndex: 0
+--- !u!114 &1975112095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975112087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fc731ece0378a3498846b159c31919b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  CurrentHunger: 10
+  MaxHunger: 10
+  HungerTickTimeGate: 30
+  HungerTickTime: 0
+  MaxHealth: 30
+  CurrentHealth: 10
+  invincibilityTime: 0
+  dead: 0
+  targetable: 1
 --- !u!1 &2107636295 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1312455477232789689, guid: 51914d19a2eb45442831b74076b7d476, type: 3}

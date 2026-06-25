@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
@@ -30,7 +31,8 @@ public class Mode_Scanner : IGameMode
         saveWindowRect = new Rect(Screen.width / 2 - 150, Screen.height / 2 - 50, 300, 120);
     }
 
-    public void SetupMovement(PlayerMovement move) { }
+    public void SetupMovement(PlayerMovement move) { move.SetFlying(true); } // TURN ON FLIGHT
+
     public void OnEnter() { }
     public void OnExit() { ClearSelection(); isTypingName = false; }
 

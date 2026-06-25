@@ -15,7 +15,7 @@ public class Mode_Commander : IGameMode
         pawnLayerMask = (layerIndex != -1) ? (1 << layerIndex) : -1;
     }
 
-    public void SetupMovement(PlayerMovement move) { }
+    public void SetupMovement(PlayerMovement move) { move.SetFlying(true); } // TURN ON FLIGHT
 
     public void OnEnter() { }
     public void OnExit() { selectedPawn = null; }

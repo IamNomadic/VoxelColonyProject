@@ -53,7 +53,8 @@ public class Mode_Builder : IGameMode
         menuRect = new Rect(Screen.width / 2 - 200, Screen.height / 2 - 200, 400, 400);
     }
 
-    public void SetupMovement(PlayerMovement move) { }
+    public void SetupMovement(PlayerMovement move) { move.SetFlying(true); } // TURN ON FLIGHT
+
     public void OnEnter() { ResetState(); }
     public void OnExit() { ResetState(); }
 
@@ -114,7 +115,7 @@ public class Mode_Builder : IGameMode
         }
     }
 
-    // --- TOOL LOGIC HANDLERS (Unchanged) ---
+    // --- TOOL LOGIC HANDLERS ---
     void HandleBoxLogic(Vector3Int gridPos)
     {
         if (Input.GetMouseButtonDown(1)) { isDragging = true; dragStart = gridPos; }

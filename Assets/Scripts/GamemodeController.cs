@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -38,6 +39,8 @@ public class GameModeController : MonoBehaviour
 
         if (interactionMask == 0) interactionMask = -1;
 
+        // --- REGISTER MODES HERE ---
+        modes.Add(new Mode_Survival(this)); // Now index 0 (Default)
         modes.Add(new Mode_Builder(this));
         modes.Add(new Mode_Commander(this));
         modes.Add(new Mode_Scanner(this));
