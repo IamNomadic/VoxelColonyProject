@@ -14,11 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   waitTime: 1
-  alignToCenter: 1
-  verticalOffset: 0.5
+  wanderRadius: 5
+  gridOffset: {x: 0.5, y: 0, z: 0.5}
+  verticalOffset: 0.1
   obstacleMask:
     serializedVersion: 2
-    m_Bits: 1
+    m_Bits: 0
   groundMask:
     serializedVersion: 2
-    m_Bits: 1
+    m_Bits: 4294967295

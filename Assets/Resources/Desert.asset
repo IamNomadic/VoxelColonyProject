@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b8308a94d7f6b4296cbf56875360c0, type: 3}
+  m_Name: Desert
+  m_EditorClassIdentifier: 
+  biomeName: 
+  debugColor: {r: 0.99285436, g: 1, b: 0, a: 1}
+  targetSize: 10
+  optimalTemperature: 0.78
+  temperatureTolerance: 0.39
+  surfaceBlock: {fileID: 11400000, guid: 6e01aaccce73c1a4ca721b477919be5e, type: 2}
+  subSurfaceBlock: {fileID: 11400000, guid: 6e01aaccce73c1a4ca721b477919be5e, type: 2}
+  baseHeight: 10
+  terrainAmplitude: 10
+  terrainScale: 0.1
+  structureGroups:
+  - {fileID: 11400000, guid: 433e5d8a6432c1d4da8fc206d3ca2da0, type: 2}

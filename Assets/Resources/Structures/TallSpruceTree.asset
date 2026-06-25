@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9eaae9a8d89fc5a48b89a8c7bf433f46, type: 3}
+  m_Name: TallSpruceTree
+  m_EditorClassIdentifier: 
+  structureJson: {fileID: 4900000, guid: 665b57dd3fb80c840869e7186e95468c, type: 3}
+  blockPalette:
+  - {fileID: 11400000, guid: 18f6c6339cfbbc24f861a2d59030127e, type: 2}
+  - {fileID: 11400000, guid: b6ed3d4302776684ab8335a4ba456865, type: 2}
+  - {fileID: 11400000, guid: c5f0a8ce3c19fa244b22726ffc4249b4, type: 2}
+  yOffset: 0
+  spawnDensity: 0.1
+  spawnRadius: 3
+  usePatchGeneration: 1
+  patchScale: 0.05
+  patchThreshold: 0.5

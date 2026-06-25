@@ -17,21 +17,16 @@ public class PlayerStats : MonoBehaviour
     public int CurrentHealth;
     public float invincibilityTime;
     float _invincibilityTime;
-    public string currentRitual;
     //public ObjectGenerator objGenerator;
     public bool dead;
-    public bool RitualsDone;
     public bool targetable;
     bool Starving;
     bool OutOfHunger= false;
 
-    public int RitualsCompleted;
-    public int RitualsToComplete;
     public static event Action OnPlayerDamaged;
     private void Start()
     {
         OutOfHunger = false;
-        RitualsDone = false;
         _invincibilityTime = invincibilityTime;
 
     }
@@ -78,10 +73,6 @@ public class PlayerStats : MonoBehaviour
             Starving = false;
 
 
-        }
-        if (RitualsCompleted>=RitualsToComplete)
-        {
-            RitualsDone = true;
         }
 
         if(_invincibilityTime>0)
