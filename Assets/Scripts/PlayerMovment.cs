@@ -1,22 +1,25 @@
 using UnityEngine;
 
-// Formerly "ExternalCameraFlightRig_CustomControls_Updated"
-// Now handles BOTH custom Kinematic Flight and CharacterController Walking.
+[RequireComponent(typeof(CharacterController), typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour
 {
     [Header("External Camera")]
     public Transform externalCamera;
     public Vector3 cameraLocalOffset = new Vector3(0f, 1.6f, 0f);
 
-    [Header("Movement Settings (Flight)")]
-    public float moveSpeed = 10f;
-    public float sprintMultiplier = 3f;
-    public float verticalSpeed = 8f;
+    [Header("Universal Movement Settings")]
+    public float moveSpeed = 6f;
+    public float sprintMultiplier = 1.5f;
 
-    [Header("Movement Settings (Survival)")]
-    public bool isFlying = true;
-    public float gravity = -20f;
+    [Header("Simulation Integration")]
+    public bool obeysSimulationClock = false; // NEW: Determines if we use real-time or sim-time
+
+    [Header("Survival Settings (Gravity)")]
     public float jumpSpeed = 8f;
+    public float gravity = -20f;
+
+    [Header("Creative Settings (Flight)")]
+    public float verticalFlySpeed = 8f;
 
     [Header("Look Settings")]
     public float mouseSensitivity = 4f;
@@ -25,44 +28,40 @@ public class PlayerMovement : MonoBehaviour
     public float maxPitch = 89f;
 
     [Header("Physics")]
-    public float playerRadius = 0.4f;
+    public float playerRadius = 1f;
     public LayerMask collisionMask;
 
     // State
+    public bool isFlying { get; private set; }
     private Rigidbody rb;
     private CharacterController charCtrl;
     private float yaw;
     private float pitch;
     private Vector3 desiredVelocity;
-    private bool isSprinting;
     private float verticalVelocity = 0f;
 
-    // --- CONTROL FLAGS ---
     public bool InputLocked { get; set; } = false;
 
     void Awake()
     {
         if (externalCamera == null && Camera.main != null) externalCamera = Camera.main.transform;
 
-        // 1. Setup Rigidbody (Used for Flight)
-        rb = GetComponent<Rigidbody>();
-        if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
+        if (externalCamera != null)
+        {
+            Camera cam = externalCamera.GetComponent<Camera>();
+            if (cam != null) cam.nearClipPlane = 0.01f;
+        }
 
+        rb = GetComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
 
-        // 2. Setup CharacterController (Used for Walking/Survival)
         charCtrl = GetComponent<CharacterController>();
-        if (charCtrl == null)
-        {
-            charCtrl = gameObject.AddComponent<CharacterController>();
-            charCtrl.radius = playerRadius;
-            charCtrl.height = 1.8f;
-            charCtrl.center = new Vector3(0, 0.9f, 0);
-            charCtrl.stepOffset = 0.6f;
-        }
+        charCtrl.radius = playerRadius;
+        charCtrl.height = 1.65f;
+        charCtrl.center = new Vector3(0, 0.5f, 0);
+        charCtrl.stepOffset = 0.2f;
 
         if (collisionMask == 0) collisionMask = -1;
 
@@ -72,32 +71,28 @@ public class PlayerMovement : MonoBehaviour
             float camPitch = externalCamera.eulerAngles.x;
             pitch = camPitch > 180f ? camPitch - 360f : camPitch;
         }
-
-        SetFlying(isFlying);
     }
 
-    // Toggle between Flight (SphereCast) and Walking (CharacterController)
     public void SetFlying(bool state)
     {
         isFlying = state;
         if (charCtrl != null) charCtrl.enabled = !isFlying;
-        if (rb != null) rb.isKinematic = true; // Always true, we manipulate it manually either way
+        verticalVelocity = 0f;
     }
 
     void Update()
     {
+        if (CommandConsole.IsOpen) return;
         if (InputLocked)
         {
             desiredVelocity = Vector3.zero;
             return;
         }
 
-        HandleLook();
+        HandleLook(); // Look is always real-time so the mouse doesn't feel broken
 
         if (isFlying) HandleFlyMove();
         else HandleWalkMove();
-
-        HandleVoidRescue();
     }
 
     void HandleLook()
@@ -109,84 +104,68 @@ public class PlayerMovement : MonoBehaviour
         pitch += my * mouseSensitivity;
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
-        // Immediate rotation for smoothness
         Quaternion rigRot = Quaternion.Euler(0f, yaw, 0f);
-        if (externalCamera != null)
-        {
-            externalCamera.rotation = rigRot * Quaternion.Euler(pitch, 0f, 0f);
-        }
-
+        if (externalCamera != null) externalCamera.rotation = rigRot * Quaternion.Euler(pitch, 0f, 0f);
         if (!isFlying) transform.rotation = rigRot;
     }
 
-    // --- YOUR ORIGINAL FLIGHT LOGIC (Untouched) ---
     void HandleFlyMove()
     {
         float forwardInput = Input.GetAxisRaw("Vertical");
         float strafeInput = Input.GetAxisRaw("Horizontal");
+        float up = (Input.GetKey(KeyCode.Space) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftControl) ? 1f : 0f);
 
-        float up = 0f;
-        if (Input.GetKey(KeyCode.Space)) up += 1f;
-        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.CapsLock)) up -= 1f;
-
-        isSprinting = Input.GetKey(KeyCode.LeftShift);
-        float targetSpeed = isSprinting ? moveSpeed * sprintMultiplier : moveSpeed;
+        float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? moveSpeed * sprintMultiplier : moveSpeed;
 
         Vector3 camForward = externalCamera.forward;
         Vector3 camRight = externalCamera.right;
-
         camForward.y = 0f; camRight.y = 0f;
         camForward.Normalize(); camRight.Normalize();
 
-        Vector3 horizontal = (camForward * forwardInput + camRight * strafeInput);
-        if (horizontal.sqrMagnitude > 1f) horizontal.Normalize();
-
-        desiredVelocity = (horizontal * targetSpeed) + (Vector3.up * (up * verticalSpeed));
+        Vector3 horizontal = (camForward * forwardInput + camRight * strafeInput).normalized;
+        desiredVelocity = (horizontal * currentSpeed) + (Vector3.up * (up * verticalFlySpeed));
     }
 
-    // --- NEW SURVIVAL WALKING LOGIC ---
     void HandleWalkMove()
     {
+        // Use Simulation Clock if active, otherwise use Unity real-time
+        float dt = (obeysSimulationClock && SimulationClock.Instance != null)
+            ? SimulationClock.Instance.SimulationDeltaTime
+            : Time.deltaTime;
+
         float forwardInput = Input.GetAxisRaw("Vertical");
         float strafeInput = Input.GetAxisRaw("Horizontal");
 
-        isSprinting = Input.GetKey(KeyCode.LeftShift);
-        float targetSpeed = isSprinting ? moveSpeed * sprintMultiplier : moveSpeed;
+        float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? moveSpeed * sprintMultiplier : moveSpeed;
 
         Vector3 camForward = externalCamera.forward;
         Vector3 camRight = externalCamera.right;
         camForward.y = 0f; camRight.y = 0f;
         camForward.Normalize(); camRight.Normalize();
 
-        Vector3 moveDir = (camForward * forwardInput + camRight * strafeInput);
-        if (moveDir.sqrMagnitude > 1f) moveDir.Normalize();
-        moveDir *= targetSpeed;
+        Vector3 moveDir = (camForward * forwardInput + camRight * strafeInput).normalized * currentSpeed;
 
-        // Jump & Gravity
         if (charCtrl.isGrounded)
         {
-            verticalVelocity = -2f; // Slight downward force to stay glued to slopes
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                verticalVelocity = jumpSpeed;
-            }
+            verticalVelocity = -2f;
+            // Prevent jumping if paused
+            if (dt > 0 && Input.GetKeyDown(KeyCode.Space)) verticalVelocity = jumpSpeed;
         }
         else
         {
-            verticalVelocity += gravity * Time.deltaTime;
+            verticalVelocity += gravity * dt;
         }
 
         moveDir.y = verticalVelocity;
 
-        if (charCtrl.enabled) charCtrl.Move(moveDir * Time.deltaTime);
+        // This will equal 0 movement if the simulation is paused!
+        if (charCtrl.enabled) charCtrl.Move(moveDir * dt);
 
-        // Keep Rigidbody synced with CharacterController position
         rb.position = transform.position;
     }
 
     void FixedUpdate()
     {
-        // YOUR ORIGINAL PHYSICS COLLISION FOR FLIGHT
         if (isFlying)
         {
             Vector3 displacement = desiredVelocity * Time.fixedDeltaTime;
@@ -195,42 +174,18 @@ public class PlayerMovement : MonoBehaviour
             if (displacement.magnitude > 0.001f)
             {
                 if (Physics.SphereCast(rb.position, playerRadius, displacement.normalized, out RaycastHit hit, displacement.magnitude, collisionMask))
-                {
-                    float d = Mathf.Max(0, hit.distance - 0.01f);
-                    finalPos = rb.position + (displacement.normalized * d);
-                }
+                    finalPos = rb.position + (displacement.normalized * Mathf.Max(0, hit.distance - 0.01f));
                 else
-                {
                     finalPos = rb.position + displacement;
-                }
             }
 
             rb.MovePosition(finalPos);
-
-            Quaternion rigRot = Quaternion.Euler(0f, yaw, 0f);
-            rb.MoveRotation(rigRot);
+            rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
         }
     }
 
     void LateUpdate()
     {
-        // Glue the camera to the player so it doesn't jitter during physics updates
-        if (externalCamera != null)
-        {
-            Quaternion rigRot = Quaternion.Euler(0f, yaw, 0f);
-            externalCamera.position = transform.position + rigRot * cameraLocalOffset;
-        }
-    }
-
-    void HandleVoidRescue()
-    {
-        // Rescues the player if they fall below the world while chunks are loading
-        if (transform.position.y < -30f)
-        {
-            if (charCtrl != null) charCtrl.enabled = false;
-            transform.position = new Vector3(transform.position.x, Chunk.CHUNK_HEIGHT + 20f, transform.position.z);
-            verticalVelocity = 0f;
-            if (!isFlying && charCtrl != null) charCtrl.enabled = true;
-        }
+        if (externalCamera != null) externalCamera.position = transform.position + Quaternion.Euler(0f, yaw, 0f) * cameraLocalOffset;
     }
 }

@@ -14,12 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blockName: Water
   isWaterSource: 0
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 0, g: 0.6511247, b: 1, a: 0.49803922}
+  tintWithBlockColor: 1
   blockScale: {x: 1, y: 1, z: 1}
   isLiquid: 1
+  maxToolUses: 0
+  durability: 0.5
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 0
+  requiresPreferredToolToDrop: 0
   height: 1
   isTransparent: 1
+  voxelModel: {fileID: 0}
+  textureLayout: 0
+  mainUV: {x: 1, y: 0}
   topUV: {x: 0, y: 0}
-  sideUV: {x: 0, y: 0}
   bottomUV: {x: 0, y: 0}
+  frontUV: {x: 0, y: 0}
+  backUV: {x: 0, y: 0}
+  leftUV: {x: 0, y: 0}
+  rightUV: {x: 0, y: 0}
+  isGrowable: 0
+  growthChance: 0.3
+  growsOn: {fileID: 0}
+  maxGrowHeight: 0
+  growsIntoStructure: {fileID: 0}

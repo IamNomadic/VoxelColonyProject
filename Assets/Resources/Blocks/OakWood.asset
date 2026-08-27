@@ -13,11 +13,33 @@ MonoBehaviour:
   m_Name: OakWood
   m_EditorClassIdentifier: 
   blockName: OakWood
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  isWaterSource: 0
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 0.4339623, g: 0.24946888, b: 0.17399432, a: 1}
+  tintWithBlockColor: 1
   blockScale: {x: 1, y: 1, z: 1}
-  height: 1
+  isLiquid: 0
+  maxToolUses: 0
+  durability: 1
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 2
+  requiresPreferredToolToDrop: 0
+  boundsMin: {x: 0, y: 0, z: 0}
+  boundsMax: {x: 1, y: 1, z: 1}
   isTransparent: 0
-  topUV: {x: 0, y: 0}
-  sideUV: {x: 0, y: 0}
-  bottomUV: {x: 0, y: 0}
+  cullSameTransparent: 0
+  voxelModel: {fileID: 0}
+  textureLayout: 1
+  mainUV: {x: 3, y: 3}
+  topUV: {x: 3, y: 2}
+  bottomUV: {x: 3, y: 2}
+  frontUV: {x: 0, y: 0}
+  backUV: {x: 0, y: 0}
+  leftUV: {x: 0, y: 0}
+  rightUV: {x: 0, y: 0}
+  isGrowable: 0
+  growthChance: 0.3
+  growsOn: {fileID: 0}
+  maxGrowHeight: 0
+  growsIntoStructure: {fileID: 0}

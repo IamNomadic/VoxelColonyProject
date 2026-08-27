@@ -1,46 +1,47 @@
+
 using System;
-using System.Collections;
-using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class PlayerStats : MonoBehaviour
 {
-    //public PlayerMovement playerMovement;
-    //public PlayerAnimationScript playerAnimation;
+    public int CurrentHunger = 100;
+    public int MaxHunger = 100;
+    public int HungerTickTimeGate = 5;
+    [SerializeField] float HungerTickTime;
 
-    public int CurrentHunger;
-    public int MaxHunger;
-    public int HungerTickTimeGate;
-    [SerializeField]float HungerTickTime;
-    public int MaxHealth;
-    public int CurrentHealth;
-    public float invincibilityTime;
-    float _invincibilityTime;
-    //public ObjectGenerator objGenerator;
+    public int MaxHealth = 100;
+    public int CurrentHealth = 100;
+
+    public float invincibilityTime = 0.5f;
+    private float _invincibilityTime;
+
     public bool dead;
     public bool targetable;
     bool Starving;
-    bool OutOfHunger= false;
+    bool OutOfHunger = false;
 
     public static event Action OnPlayerDamaged;
+
     private void Start()
     {
         OutOfHunger = false;
         _invincibilityTime = invincibilityTime;
-
+        CurrentHealth = MaxHealth;
+        CurrentHunger = MaxHunger;
     }
-    
-    // Update is called once per frame
-    public void FixedUpdate()
+
+    public void Update()
     {
+        if (SimulationClock.Instance == null || dead) return;
+
+        float simDelta = SimulationClock.Instance.SimulationDeltaTime;
+
         if (OutOfHunger == false || Starving == true)
         {
-            HungerTickTime += Time.deltaTime;
-
+            HungerTickTime += simDelta;
         }
-        
-        if (HungerTickTime >=HungerTickTimeGate)
+
+        if (HungerTickTime >= HungerTickTimeGate)
         {
             HungerTickTime = 0;
             CurrentHunger--;
@@ -49,103 +50,58 @@ public class PlayerStats : MonoBehaviour
                 TakeDamage(1);
             }
             OnPlayerDamaged?.Invoke();
+        }
 
-            Debug.Log("lost 1 hunger");
+        if (CurrentHealth > MaxHealth) CurrentHealth = MaxHealth;
+        if (CurrentHunger > MaxHunger) CurrentHunger = MaxHunger;
 
-        }
-        if (CurrentHealth > MaxHealth)
-        {
-            CurrentHealth = MaxHealth;
-        }
-        if (CurrentHunger > MaxHunger)
-        {
-            CurrentHunger = MaxHunger;
-        }
-        if (CurrentHunger <=0)
+        if (CurrentHunger <= 0)
         {
             OutOfHunger = true;
             Starving = true;
-            
         }
-        else if (CurrentHunger>0)
+        else if (CurrentHunger > 0)
         {
             OutOfHunger = false;
             Starving = false;
-
-
         }
 
-        if(_invincibilityTime>0)
+        if (_invincibilityTime > 0)
         {
-            _invincibilityTime = _invincibilityTime - Time.deltaTime;
+            _invincibilityTime -= simDelta;
         }
-       
-
-
-
-
     }
 
-    public void RefreshHud()
-    {
-        OnPlayerDamaged?.Invoke();
-
-    }
-
-    private IEnumerator LevelReset()
-    {
-
-        yield return new WaitForSeconds(6.3f);
-        dead = false;
-        SceneManager.LoadScene("Title");
-    }
+    public void RefreshHud() { OnPlayerDamaged?.Invoke(); }
 
     public void TakeDamage(int damage)
     {
-        if(_invincibilityTime<=0)
+        if (_invincibilityTime <= 0 && !dead)
         {
             CurrentHealth -= damage;
-            Debug.Log("takedDmag");
-
             OnPlayerDamaged?.Invoke();
-            //playerAnimation.FlashRed();
             _invincibilityTime = invincibilityTime;
+
             if (CurrentHealth <= 0)
             {
-                StartCoroutine("LevelReset");
-                Debug.Log("you are dead");
-
-
                 dead = true;
             }
-
         }
     }
+
     public void HealDamage(int Health)
     {
-        
-            CurrentHealth += Health;
-       
+        if (dead) return;
+
+        CurrentHealth += Health;
         OnPlayerDamaged?.Invoke();
-        if (CurrentHealth <= 0)
-        {
-            StartCoroutine("LevelReset");
-            Debug.Log("you are dead");
-
-
-            dead = true;
-        }
     }
+
     public void GainHunger(int Hunger)
     {
-       
-        CurrentHunger += Hunger; 
+        if (dead) return;
 
+        CurrentHunger += Hunger;
         OnPlayerDamaged?.Invoke();
-    }
-    public void OnCollisionEnter2D (Collision2D DeathBox)
-    {
-       
-     
     }
 }

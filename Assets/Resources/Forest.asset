@@ -21,6 +21,10 @@ MonoBehaviour:
   subSurfaceBlock: {fileID: 11400000, guid: d0c417f1261d8e54bbd3e0f09f75e11b, type: 2}
   baseHeight: 10
   terrainAmplitude: 10
-  terrainScale: 0.05
+  terrainScale: 0.03
+  varianceNoiseScale: 0.01
+  baseHeightVariance: 5
+  terrainAmplitudeVariance: 5
+  terrainScaleVariance: 0.02
   structureGroups:
   - {fileID: 11400000, guid: b639d330140d0e7479da5042ec01c713, type: 2}

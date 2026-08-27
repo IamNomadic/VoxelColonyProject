@@ -14,13 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blockName: 32TestBench
   isWaterSource: 0
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 0.33895844, g: 0.6415094, b: 0.2753649, a: 1}
+  tintWithBlockColor: 1
   blockScale: {x: 1, y: 1, z: 1}
   isLiquid: 0
+  maxToolUses: 0
+  durability: 0.5
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 0
+  requiresPreferredToolToDrop: 0
   height: 1
   isTransparent: 0
   voxelModel: {fileID: 11400000, guid: b21848d0494e07242960a0d01fb8d258, type: 2}
+  textureLayout: 0
+  mainUV: {x: 1, y: 0}
   topUV: {x: 0, y: 0}
-  sideUV: {x: 0, y: 0}
   bottomUV: {x: 0, y: 0}
+  frontUV: {x: 1, y: 0}
+  backUV: {x: 1, y: 0}
+  leftUV: {x: 1, y: 0}
+  rightUV: {x: 1, y: 0}
+  isGrowable: 0
+  growthChance: 0.3
+  growsOn: {fileID: 0}
+  maxGrowHeight: 0
+  growsIntoStructure: {fileID: 0}

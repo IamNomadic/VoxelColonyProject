@@ -13,11 +13,33 @@ MonoBehaviour:
   m_Name: SpruceLeaves
   m_EditorClassIdentifier: 
   blockName: SpruceLeaves
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  isWaterSource: 0
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 0.15801886, g: 0.5, b: 0.24234371, a: 1}
+  tintWithBlockColor: 1
   blockScale: {x: 1, y: 1, z: 1}
-  height: 1
+  isLiquid: 0
+  maxToolUses: 0
+  durability: 0.2
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 0
+  requiresPreferredToolToDrop: 0
+  boundsMin: {x: 0, y: 0, z: 0}
+  boundsMax: {x: 1, y: 1, z: 1}
   isTransparent: 0
+  cullSameTransparent: 0
+  voxelModel: {fileID: 0}
+  textureLayout: 0
+  mainUV: {x: 4, y: 4}
   topUV: {x: 0, y: 0}
-  sideUV: {x: 0, y: 0}
   bottomUV: {x: 0, y: 0}
+  frontUV: {x: 0, y: 0}
+  backUV: {x: 0, y: 0}
+  leftUV: {x: 0, y: 0}
+  rightUV: {x: 0, y: 0}
+  isGrowable: 0
+  growthChance: 0.3
+  growsOn: {fileID: 0}
+  maxGrowHeight: 0
+  growsIntoStructure: {fileID: 0}

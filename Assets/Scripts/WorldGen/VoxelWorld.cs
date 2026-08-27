@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -55,6 +56,7 @@ public class VoxelWorld : MonoBehaviour
     private Vector2Int lastPlayerChunkCoord = new Vector2Int(-999999, -999999);
 
     public bool IsGenerating { get; private set; }
+    public IEnumerable<Chunk> ActiveChunks => activeChunks.Values;
 
     void Start()
     {
@@ -540,6 +542,48 @@ public class VoxelWorld : MonoBehaviour
         }
     }
 
+    // Call this specifically when dropping structures (like trees from saplings) dynamically during gameplay
+    public void SpawnStructureRuntime(int rootX, int rootY, int rootZ, StructureDataSO structureData)
+    {
+        var blocks = structureData.GetStructure();
+        int rotation = UnityEngine.Random.Range(0, 4);
+        HashSet<Vector2Int> chunksToUpdate = new HashSet<Vector2Int>();
+
+        foreach (var kvp in blocks)
+        {
+            Vector3Int offset = kvp.Key;
+            BlockData block = kvp.Value;
+            Vector3Int rotOffset = RotatePoint(offset, rotation);
+
+            int bx = rootX + rotOffset.x;
+            int by = rootY + rotOffset.y;
+            int bz = rootZ + rotOffset.z;
+
+            // Only overwrite if inside the world limits
+            if (by >= 0 && by < Chunk.CHUNK_HEIGHT)
+            {
+                SetBlockDataOnly(bx, by, bz, block);
+                chunksToUpdate.Add(GetChunkCoord(bx, bz));
+            }
+        }
+
+        // Add immediate neighbors to ensure faces and lighting update correctly across chunk borders
+        HashSet<Vector2Int> finalUpdates = new HashSet<Vector2Int>();
+        foreach (var c in chunksToUpdate)
+        {
+            finalUpdates.Add(c);
+            finalUpdates.Add(new Vector2Int(c.x + 1, c.y));
+            finalUpdates.Add(new Vector2Int(c.x - 1, c.y));
+            finalUpdates.Add(new Vector2Int(c.x, c.y + 1));
+            finalUpdates.Add(new Vector2Int(c.x, c.y - 1));
+        }
+
+        foreach (var c in finalUpdates)
+        {
+            UpdateChunkMesh(c.x, c.y);
+        }
+    }
+
     Vector3Int RotatePoint(Vector3Int p, int rotation)
     {
         if (rotation == 0) return p;
@@ -618,8 +662,12 @@ public class VoxelWorld : MonoBehaviour
         StopAllCoroutines();
         chunksMeshQueued.Clear(); chunksDataQueued.Clear(); creationList.Clear(); meshingList.Clear();
 
-        // NEW: Tell PawnSpawner to purge its active units
-        FindObjectOfType<PawnSpawner>()?.ClearAllPawns();
+        // FIXED: Safely find and destroy all Pawns in the world instead of looking for PawnSpawner
+        Pawn[] allPawns = FindObjectsOfType<Pawn>();
+        foreach (Pawn p in allPawns)
+        {
+            if (p != null) Destroy(p.gameObject);
+        }
 
         if (generateNewSeeds)
         {

@@ -13,11 +13,31 @@ MonoBehaviour:
   m_Name: Sand
   m_EditorClassIdentifier: 
   blockName: Sand
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  isWaterSource: 0
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 1, g: 0.92225754, b: 0.5613208, a: 1}
+  tintWithBlockColor: 0
   blockScale: {x: 1, y: 1, z: 1}
+  isLiquid: 0
+  maxToolUses: 0
+  durability: 0.2
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 3
+  requiresPreferredToolToDrop: 0
   height: 1
   isTransparent: 0
+  voxelModel: {fileID: 0}
+  textureLayout: 0
+  mainUV: {x: 1, y: 1}
   topUV: {x: 0, y: 0}
-  sideUV: {x: 0, y: 0}
   bottomUV: {x: 0, y: 0}
+  frontUV: {x: 0, y: 0}
+  backUV: {x: 0, y: 0}
+  leftUV: {x: 0, y: 0}
+  rightUV: {x: 0, y: 0}
+  isGrowable: 0
+  growthChance: 0.3
+  growsOn: {fileID: 0}
+  maxGrowHeight: 0
+  growsIntoStructure: {fileID: 0}

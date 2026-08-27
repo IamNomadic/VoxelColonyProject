@@ -13,6 +13,33 @@ MonoBehaviour:
   m_Name: Cactus
   m_EditorClassIdentifier: 
   blockName: Cactus
-  blockMaterial: {fileID: 2100000, guid: 730aae8835b67024bb58f9ce64b08230, type: 2}
+  isWaterSource: 0
+  blockMaterial: {fileID: -876546973899608171, guid: fda373b4279e9a043b85194591a0fda2, type: 3}
   blockColor: {r: 0.042052336, g: 0.3301887, b: 0.08025065, a: 1}
+  tintWithBlockColor: 0
   blockScale: {x: 1, y: 1, z: 1}
+  isLiquid: 0
+  maxToolUses: 0
+  durability: 1
+  toolType: 0
+  toolSpeedMultiplier: 2
+  preferredTool: 2
+  requiresPreferredToolToDrop: 0
+  boundsMin: {x: 0.0625, y: 0, z: 0.0625}
+  boundsMax: {x: 0.9375, y: 1, z: 0.9375}
+  isTransparent: 0
+  cullSameTransparent: 0
+  voxelModel: {fileID: 0}
+  textureLayout: 1
+  mainUV: {x: 1, y: 2}
+  topUV: {x: 2, y: 2}
+  bottomUV: {x: 2, y: 2}
+  frontUV: {x: 0, y: 0}
+  backUV: {x: 0, y: 0}
+  leftUV: {x: 0, y: 0}
+  rightUV: {x: 0, y: 0}
+  isGrowable: 1
+  growthChance: 0.837
+  growsOn: {fileID: 11400000, guid: 6e01aaccce73c1a4ca721b477919be5e, type: 2}
+  maxGrowHeight: 6
+  growsIntoStructure: {fileID: 0}
